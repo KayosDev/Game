@@ -240,18 +240,110 @@ func level_up():
 	player_xp -= xp_to_next_level
 	xp_to_next_level = int(xp_to_next_level * xp_scale_factor)
 	
+	# EXTREME level up effect - time pause, flash, and more
+	Engine.time_scale = 0.01 # Almost completely freeze time
+	await get_tree().create_timer(0.05 * 0.01).timeout # Wait for 0.05 real seconds
+	Engine.time_scale = 0.3 # Slow time for dramatic effect
+	
+	# Massive screen flash
+	var level_flash = ColorRect.new()
+	level_flash.color = Color(0.5, 1.0, 0.5, 0.0) # Green tint
+	level_flash.anchors_preset = Control.PRESET_FULL_RECT
+	$UILayer.add_child(level_flash)
+	
+	# Flash animation
+	var flash_tween = create_tween()
+	flash_tween.tween_property(level_flash, "color:a", 0.6, 0.1)
+	flash_tween.tween_property(level_flash, "color:a", 0.0, 0.5)
+	flash_tween.tween_callback(func(): level_flash.queue_free())
+	
 	# Play level up effect with more particles
 	if level_up_effect:
 		level_up_effect.emitting = true
-		level_up_effect.amount = 100  # More particles
-		level_up_effect.lifetime = 2.0  # Longer duration
+		level_up_effect.amount = 150  # WAY more particles
+		level_up_effect.lifetime = 2.5  # Longer duration
+	
+	# Add radial burst particles from player
+	if is_instance_valid(player):
+		var burst = CPUParticles2D.new()
+		burst.position = player.global_position
+		burst.amount = 80
+		burst.lifetime = 1.5
+		burst.explosiveness = 1.0
+		burst.direction = Vector2(0, 0)
+		burst.spread = 180
+		burst.gravity = Vector2.ZERO
+		burst.initial_velocity_min = 150
+		burst.initial_velocity_max = 300
+		burst.scale_amount_min = 5
+		burst.scale_amount_max = 12
+		burst.color = Color(0.3, 1.0, 0.5) # Green
+		burst.emitting = true
+		burst.one_shot = true
+		add_child(burst)
+		
+		# Auto-remove
+		var timer = Timer.new()
+		timer.wait_time = 2.0
+		timer.one_shot = true
+		timer.autostart = true
+		burst.add_child(timer)
+		timer.timeout.connect(func(): burst.queue_free())
+	
+	# Add shockwave effect at player position with green color
+	if is_instance_valid(player):
+		var center = get_viewport().get_screen_transform() * player.global_position
+		var shockwave = Node2D.new()
+		shockwave.position = center
+		add_child(shockwave)
+		
+		var draw_node = Node2D.new()
+		draw_node.position = Vector2.ZERO
+		shockwave.add_child(draw_node)
+		
+		var max_radius = 300.0
+		var current_radius = 0
+		var thickness = 8.0
+		
+		draw_node.draw.connect(func():
+			var color = Color(0.5, 1.0, 0.5, 0.8 - current_radius / max_radius * 0.8)
+			draw_arc(Vector2.ZERO, current_radius, 0, TAU, 40, color, thickness)
+		)
+		
+		var wave_tween = create_tween()
+		wave_tween.tween_method(func(radius):
+			current_radius = radius
+			draw_node.queue_redraw()
+		, 0.0, max_radius, 0.8)
+		
+		wave_tween.tween_callback(func(): shockwave.queue_free())
 	
 	# Massive screen shake for level up
-	apply_screen_shake(15.0, 0.5)
+	apply_screen_shake(25.0, 0.8) # Increased from 15.0
 	
-	# Heal player on level up
+	# Heal player on level up with particles
 	if player.has_method("heal"):
-		player.heal(50)
+		player.heal(100) # Increased from 50
+		
+		# Add heal confirmation text
+		var heal_text = Label.new()
+		heal_text.text = "+100 HEALTH!"
+		heal_text.position = player.global_position + Vector2(0, -60)
+		heal_text.add_theme_font_size_override("font_size", 24)
+		heal_text.add_theme_color_override("font_color", Color(0.2, 1.0, 0.4))
+		heal_text.add_theme_constant_override("outline_size", 2)
+		heal_text.add_theme_color_override("font_outline_color", Color(0.0, 0.5, 0.0))
+		heal_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		add_child(heal_text)
+		
+		var heal_tween = create_tween()
+		heal_tween.tween_property(heal_text, "position:y", heal_text.position.y - 40, 1.0)
+		heal_tween.parallel().tween_property(heal_text, "modulate:a", 0, 1.0)
+		heal_tween.tween_callback(func(): heal_text.queue_free())
+	
+	# Restore time scale gradually
+	var time_tween = create_tween()
+	time_tween.tween_property(Engine, "time_scale", 1.0, 0.7)
 	
 	# Show upgrade popup
 	show_upgrade_popup()
@@ -367,17 +459,72 @@ func _on_player_damaged(amount):
 	# Enhanced reaction to player damage
 	shake_strength = player_hit_shake_strength
 	
-	# Spawn damage particles
-	spawn_screen_particles(amount / 5)
+	# Dynamic shake based on damage amount
+	var actual_shake = player_hit_shake_strength * (1.0 + float(amount) / 50.0)
 	
-	# Brief slow-mo effect for impactful feel
-	Engine.time_scale = 0.7
+	# Direction-based screen shake (assuming player is hit from a random direction for now)
+	var hit_direction = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
+	camera.offset = hit_direction * actual_shake * 0.5
+	
+	# Dramatic red vignette flash effect when damaged
+	var damage_flash = ColorRect.new()
+	damage_flash.color = Color(0.8, 0.0, 0.0, 0.0)
+	damage_flash.anchors_preset = Control.PRESET_FULL_RECT
+	$UILayer.add_child(damage_flash)
+	
+	# Flash animation
+	var flash_tween = create_tween()
+	flash_tween.tween_property(damage_flash, "color:a", clamp(float(amount) / 50.0, 0.2, 0.6), 0.05)
+	flash_tween.tween_property(damage_flash, "color:a", 0.0, 0.3)
+	flash_tween.tween_callback(func(): damage_flash.queue_free())
+	
+	# Spawn blood particles
+	spawn_blood_particles(amount)
+	
+	# Brief slow-mo effect for impactful feel - scaled by damage
+	var slow_factor = clamp(map_range(amount, 10, 50, 0.8, 0.5), 0.5, 0.8)
+	Engine.time_scale = slow_factor
 	var timer = Timer.new()
-	timer.wait_time = 0.15
+	timer.wait_time = 0.15 * slow_factor # Scale time with slow factor
 	timer.one_shot = true
 	timer.autostart = true
 	add_child(timer)
-	timer.timeout.connect(func(): Engine.time_scale = 1.0)
+	timer.timeout.connect(func(): 
+		# Quick ramp up to normal speed for punchier feel
+		Engine.time_scale = 1.1
+		await get_tree().create_timer(0.1).timeout
+		Engine.time_scale = 1.0
+	)
+
+# Spawn blood particles when player takes damage
+func spawn_blood_particles(amount):
+	if !is_instance_valid(player):
+		return
+		
+	var blood = CPUParticles2D.new()
+	blood.position = player.global_position
+	blood.amount = 10 + amount / 2 # More particles for bigger hits
+	blood.lifetime = 0.8
+	blood.explosiveness = 0.9
+	blood.direction = Vector2(0, -1)
+	blood.spread = 180
+	blood.gravity = Vector2(0, 400)
+	blood.initial_velocity_min = 100
+	blood.initial_velocity_max = 200
+	blood.scale_amount_min = 3
+	blood.scale_amount_max = 7
+	blood.color = Color(0.8, 0.05, 0.05)
+	blood.emitting = true
+	blood.one_shot = true
+	add_child(blood)
+	
+	# Auto-remove when done
+	var timer = Timer.new()
+	timer.wait_time = 1.0
+	timer.one_shot = true
+	timer.autostart = true
+	blood.add_child(timer)
+	timer.timeout.connect(func(): blood.queue_free())
 
 func _on_player_died():
 	# Print debug message
@@ -747,71 +894,139 @@ func apply_screen_shake(amount: float, duration: float = 0.3):
 	# Set the shake strength based on the amount
 	shake_strength = max(shake_strength, amount)
 	
+	# Enhanced time distortion effects for stronger impacts
+	var time_effect_threshold = 10.0 # Threshold for time effects
+	if amount > time_effect_threshold:
+		# Stronger impacts briefly slow time for dramatic effect
+		var slowdown = clamp(map_range(amount, time_effect_threshold, 30.0, 0.8, 0.3), 0.3, 0.8)
+		Engine.time_scale = slowdown
+		
+		var restore_timer = Timer.new()
+		restore_timer.wait_time = 0.08 # Very brief pause
+		restore_timer.one_shot = true
+		restore_timer.autostart = true
+		add_child(restore_timer)
+		restore_timer.timeout.connect(func():
+			# Snap back to normal speed with slight overspeed for punchiness
+			Engine.time_scale = 1.05
+			await get_tree().create_timer(0.1).timeout
+			Engine.time_scale = 1.0
+		)
+	
+	# Ultra-satisfying edge flash effect
+	if amount > 15.0:
+		create_screen_flash()
+	
+	# Create shockwave effect for stronger impacts
+	if amount > 12.0:
+		create_shockwave_effect(amount)
+	
 	# Create additional particle effects explosion at random positions
 	spawn_screen_particles(3 + int(amount))
-	
-	# Optional: slow time briefly for impact
-	if amount > 10.0:
-		Engine.time_scale = 0.8
-		var timer = Timer.new()
-		timer.wait_time = 0.1
-		timer.one_shot = true
-		timer.autostart = true
-		add_child(timer)
-		timer.timeout.connect(func(): Engine.time_scale = 1.0)
 
-func spawn_screen_particles(count: int):
-	# Disabled random particle effects
-	return
+# Utility function to remap a value from one range to another
+func map_range(value: float, in_min: float, in_max: float, out_min: float, out_max: float) -> float:
+	return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+# Create dramatic edge flash effect
+func create_screen_flash():
+	var flash = ColorRect.new()
+	flash.color = Color(1, 1, 1, 0.0)
+	flash.anchors_preset = Control.PRESET_FULL_RECT
 	
-	# Original code below (now disabled)
+	# Add to UI layer
+	$UILayer.add_child(flash)
+	
+	# Flash animation
+	var tween = create_tween()
+	tween.tween_property(flash, "color:a", 0.3, 0.05)
+	tween.tween_property(flash, "color:a", 0.0, 0.15)
+	tween.tween_callback(func(): flash.queue_free())
+
+# Create shockwave ripple effect
+func create_shockwave_effect(strength: float):
+	var center = get_viewport_rect().size / 2
+	
+	# Create shockwave circle
+	var shockwave = Node2D.new()
+	shockwave.position = center
+	add_child(shockwave)
+	
+	# Get reference to the player's position in screen space
+	var player_screen_pos = center
+	if is_instance_valid(player):
+		player_screen_pos = get_viewport().get_screen_transform() * player.global_position
+	
+	# Create animated shockwave
+	var draw_node = Node2D.new()
+	draw_node.position = Vector2.ZERO
+	shockwave.add_child(draw_node)
+	
+	# Set up drawing function
+	var max_radius = strength * 4
+	var current_radius = 0
+	var thickness = 4.0
+	
+	draw_node.draw.connect(func():
+		var color = Color(1, 1, 1, 0.4 - current_radius / max_radius * 0.4)
+		draw_arc(Vector2.ZERO, current_radius, 0, TAU, 32, color, thickness)
+	)
+	
+	# Animation
+	var tween = create_tween()
+	tween.tween_method(func(radius):
+		current_radius = radius
+		draw_node.queue_redraw()
+	, 0.0, max_radius, 0.4)
+	
+	# Clean up
+	tween.tween_callback(func(): shockwave.queue_free())
+
+# Reduced random particle effects to a minimum
+func spawn_screen_particles(count: int):
+	# Only spawn one particle no matter what count was requested
+	# This significantly reduces visual noise
+	
+	# Get the screen size
 	var screen_size = get_viewport_rect().size
 	
-	for i in range(count):
-		# Create a random explosion effect
-		var particles = CPUParticles2D.new()
-		particles.position = Vector2(
-			randf_range(100, screen_size.x - 100),
-			randf_range(100, screen_size.y - 100)
-		)
-		
-		# Configure particles
-		particles.amount = randi_range(10, 30)
-		particles.lifetime = randf_range(0.5, 1.0)
-		particles.explosiveness = 0.8
-		particles.randomness = 0.5
-		particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-		particles.direction = Vector2(0, -1)
-		particles.spread = 180
-		particles.gravity = Vector2.ZERO
-		particles.initial_velocity_min = 50
-		particles.initial_velocity_max = 150
-		particles.scale_amount_min = randf_range(2, 5)
-		particles.scale_amount_max = randf_range(2, 5)
-		
-		# Random color based on explosion type
-		var color_type = randi() % 3
-		if color_type == 0:
-			particles.color = Color(1.0, 0.5, 0.2) # Orange
-		elif color_type == 1:
-			particles.color = Color(0.3, 0.7, 1.0) # Blue
-		else:
-			particles.color = Color(1.0, 0.2, 0.8) # Pink
-		
-		# One-shot explosion
-		particles.emitting = true
-		particles.one_shot = true
-		
-		# Add to scene
-		add_child(particles)
-		
-		# Auto-remove when done
-		var timer = Timer.new()
-		timer.wait_time = particles.lifetime * 1.5
-		timer.one_shot = true
-		timer.autostart = true
-		particles.add_child(timer)
-		timer.timeout.connect(func(): particles.queue_free())
+	# Create a single explosion effect
+	var particles = CPUParticles2D.new()
+	particles.position = Vector2(
+		randf_range(100, screen_size.x - 100),
+		randf_range(100, screen_size.y - 100)
+	)
+	
+	# Configure particles - much more minimal
+	particles.amount = 10
+	particles.lifetime = 0.5
+	particles.explosiveness = 0.9
+	particles.randomness = 0.3
+	particles.direction = Vector2(0, -1)
+	particles.spread = 180
+	particles.gravity = Vector2.ZERO
+	particles.initial_velocity_min = 50
+	particles.initial_velocity_max = 120
+	particles.scale_amount_min = 2
+	particles.scale_amount_max = 4
+	
+	# Simple color
+	particles.color = Color(1.0, 0.5, 0.1) # Orange
+	
+	# One-shot explosion
+	particles.emitting = true
+	particles.one_shot = true
+	
+	# Add to scene
+	add_child(particles)
+	
+	# Auto-remove when done
+	var timer = Timer.new()
+	timer.wait_time = particles.lifetime * 1.5
+	timer.one_shot = true
+	timer.autostart = true
+	particles.add_child(timer)
+	timer.timeout.connect(func(): particles.queue_free())
 
 # Console command methods
 func console_restart_game():

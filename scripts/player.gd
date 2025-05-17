@@ -133,6 +133,7 @@ var pause_menu_scene = preload("res://scenes/pause_menu.tscn")
 var pause_menu_instance = null
 var post_processing_scene = preload("res://scenes/post_processing.tscn")
 var post_processing_instance = null
+var upgrade_menu_instance = null
 
 func _ready():
 	screen_size = get_viewport_rect().size
@@ -1674,3 +1675,727 @@ func setup_post_processing():
 	
 	# Make sure it's always the last layer for proper rendering
 	post_processing_instance.layer = 10
+
+# Replace this section with the new stunning upgrade menu implementation
+func show_upgrade_menu(available_upgrades = null):
+	# Create a canvas layer for the upgrade menu
+	var canvas_layer = CanvasLayer.new()
+	canvas_layer.layer = 10
+	canvas_layer.name = "UpgradeMenuLayer"
+	
+	# Create animated background
+	var background = ColorRect.new()
+	background.color = Color(0.05, 0.0, 0.12, 0.9) # Dark purple background
+	background.anchors_preset = Control.PRESET_FULL_RECT
+	canvas_layer.add_child(background)
+	
+	# Create fancy background grid
+	var grid = create_grid_background()
+	grid.anchors_preset = Control.PRESET_FULL_RECT
+	canvas_layer.add_child(grid)
+	
+	# Create main container
+	var container = VBoxContainer.new()
+	container.anchors_preset = Control.PRESET_CENTER
+	container.size = Vector2(700, 500)
+	container.position = Vector2(-350, -250)
+	canvas_layer.add_child(container)
+	
+	# Create fancy title with glow effect
+	var title_container = CenterContainer.new()
+	title_container.use_top_left = false
+	container.add_child(title_container)
+	
+	# Shadow/glow effect for title
+	var title_panel = PanelContainer.new()
+	var title_style = StyleBoxFlat.new()
+	title_style.bg_color = Color(0.2, 0.05, 0.3, 0.7)
+	title_style.border_width_left = 2
+	title_style.border_width_top = 2
+	title_style.border_width_right = 2
+	title_style.border_width_bottom = 2
+	title_style.border_color = Color(0.7, 0.3, 1.0)
+	title_style.corner_radius_top_left = 15
+	title_style.corner_radius_top_right = 15
+	title_style.corner_radius_bottom_left = 15
+	title_style.corner_radius_bottom_right = 15
+	title_style.expand_margin_left = 20
+	title_style.expand_margin_top = 10
+	title_style.expand_margin_right = 20
+	title_style.expand_margin_bottom = 10
+	title_panel.add_theme_stylebox_override("panel", title_style)
+	title_container.add_child(title_panel)
+	
+	# Title text
+	var title_margin = MarginContainer.new()
+	title_margin.add_theme_constant_override("margin_left", 20)
+	title_margin.add_theme_constant_override("margin_right", 20)
+	title_margin.add_theme_constant_override("margin_top", 10)
+	title_margin.add_theme_constant_override("margin_bottom", 10)
+	title_panel.add_child(title_margin)
+	
+	var title = Label.new()
+	title.text = "LEVEL UP!"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 72)
+	title.add_theme_color_override("font_color", Color(0.9, 0.3, 0.9))
+	title_margin.add_child(title)
+	
+	# Add subtitle
+	var subtitle_container = CenterContainer.new()
+	container.add_child(subtitle_container)
+	
+	var subtitle_panel = PanelContainer.new()
+	var subtitle_style = StyleBoxFlat.new()
+	subtitle_style.bg_color = Color(0.15, 0.05, 0.25, 0.6)
+	subtitle_style.border_width_left = 1
+	subtitle_style.border_width_top = 1
+	subtitle_style.border_width_right = 1
+	subtitle_style.border_width_bottom = 1
+	subtitle_style.border_color = Color(0.6, 0.2, 0.8)
+	subtitle_style.corner_radius_top_left = 8
+	subtitle_style.corner_radius_top_right = 8
+	subtitle_style.corner_radius_bottom_left = 8
+	subtitle_style.corner_radius_bottom_right = 8
+	subtitle_style.expand_margin_left = 10
+	subtitle_style.expand_margin_top = 5
+	subtitle_style.expand_margin_right = 10
+	subtitle_style.expand_margin_bottom = 5
+	subtitle_panel.add_theme_stylebox_override("panel", subtitle_style)
+	subtitle_container.add_child(subtitle_panel)
+	
+	var subtitle_margin = MarginContainer.new()
+	subtitle_margin.add_theme_constant_override("margin_left", 10)
+	subtitle_margin.add_theme_constant_override("margin_right", 10)
+	subtitle_margin.add_theme_constant_override("margin_top", 5)
+	subtitle_margin.add_theme_constant_override("margin_bottom", 5)
+	subtitle_panel.add_child(subtitle_margin)
+	
+	var subtitle = Label.new()
+	subtitle.text = "CHOOSE YOUR UPGRADE"
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_font_size_override("font_size", 24)
+	subtitle.add_theme_color_override("font_color", Color(0.9, 0.5, 0.9))
+	subtitle_margin.add_child(subtitle)
+	
+	# Spacing
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 20)
+	container.add_child(spacer)
+	
+	# Create upgrade options container with better styling
+	var options_container = HBoxContainer.new()
+	options_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	options_container.size_flags_horizontal = Control.SIZE_FILL
+	options_container.custom_minimum_size = Vector2(0, 320)
+	container.add_child(options_container)
+	
+	# Define available upgrades if not provided
+	if available_upgrades == null:
+		available_upgrades = [
+			{
+				"type": "max_health",
+				"value": 20,
+				"name": "Max Health",
+				"description": "Increase maximum health by 20 points. Survive longer against waves of enemies!",
+				"icon_color": Color(1.0, 0.3, 0.3),
+				"border_color": Color(1.0, 0.5, 0.5),
+				"bg_color": Color(0.5, 0.1, 0.1, 0.8)
+			},
+			{
+				"type": "damage",
+				"value": 10,
+				"name": "Attack Power",
+				"description": "Increase melee damage by 10 points. Destroy enemies faster with your powerful strikes!",
+				"icon_color": Color(1.0, 0.7, 0.2),
+				"border_color": Color(1.0, 0.8, 0.3),
+				"bg_color": Color(0.5, 0.3, 0.1, 0.8)
+			},
+			{
+				"type": "speed",
+				"value": 30,
+				"name": "Movement Speed",
+				"description": "Increase movement speed by 30 points. Dash through the battlefield with lightning speed!",
+				"icon_color": Color(0.2, 0.8, 0.6),
+				"border_color": Color(0.3, 0.9, 0.7),
+				"bg_color": Color(0.1, 0.4, 0.3, 0.8)
+			}
+		]
+		
+		# Add weapon upgrades if we have space
+		if active_weapons.size() < max_weapons:
+			# Add a random weapon from available types that player doesn't have yet
+			var available_weapon_types = []
+			for weapon_type in weapon_types.keys():
+				if not active_weapons.has(weapon_type):
+					available_weapon_types.append(weapon_type)
+			
+			if available_weapon_types.size() > 0:
+				var random_weapon = available_weapon_types[randi() % available_weapon_types.size()]
+				available_upgrades.append({
+					"type": "add_weapon",
+					"value": random_weapon,
+					"name": weapon_types[random_weapon].name,
+					"description": "New weapon: " + weapon_types[random_weapon].name + ". Add a powerful new weapon to your arsenal!",
+					"icon_color": weapon_types[random_weapon].color,
+					"border_color": weapon_types[random_weapon].color.lightened(0.3),
+					"bg_color": weapon_types[random_weapon].color.darkened(0.5).lerp(Color(0.1, 0.1, 0.2), 0.5)
+				})
+		
+		# Add weapon level up option for an existing weapon
+		if active_weapons.size() > 0:
+			var random_active_weapon = active_weapons[randi() % active_weapons.size()]
+			available_upgrades.append({
+				"type": "upgrade_weapon",
+				"value": random_active_weapon,
+				"name": "Upgrade " + weapon_types[random_active_weapon].name,
+				"description": "Increase the power of your " + weapon_types[random_active_weapon].name + ". Make it even more devastating!",
+				"icon_color": weapon_types[random_active_weapon].color,
+				"border_color": weapon_types[random_active_weapon].color.lightened(0.3),
+				"bg_color": weapon_types[random_active_weapon].color.darkened(0.5).lerp(Color(0.1, 0.1, 0.2), 0.5)
+			})
+	
+	# Shuffle upgrades and pick 3
+	available_upgrades.shuffle()
+	var display_upgrades = available_upgrades.slice(0, min(3, available_upgrades.size()))
+	
+	# Create option cards with better styling
+	for upgrade in display_upgrades:
+		var card_container = MarginContainer.new()
+		card_container.add_theme_constant_override("margin_left", 10)
+		card_container.add_theme_constant_override("margin_right", 10)
+		card_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card_container.custom_minimum_size = Vector2(200, 320)
+		
+		var card = PanelContainer.new()
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		card_container.add_child(card)
+		
+		# Add stylish card background
+		var card_style = StyleBoxFlat.new()
+		card_style.bg_color = upgrade.get("bg_color", Color(0.15, 0.1, 0.2, 0.8))
+		card_style.border_width_left = 3
+		card_style.border_width_top = 3
+		card_style.border_width_right = 3
+		card_style.border_width_bottom = 3
+		card_style.border_color = upgrade.get("border_color", Color(0.6, 0.3, 0.9))
+		card_style.corner_radius_top_left = 15
+		card_style.corner_radius_top_right = 15
+		card_style.corner_radius_bottom_left = 15
+		card_style.corner_radius_bottom_right = 15
+		card_style.shadow_color = Color(0, 0, 0, 0.5)
+		card_style.shadow_size = 6
+		card_style.shadow_offset = Vector2(2, 2)
+		card.add_theme_stylebox_override("panel", card_style)
+		
+		# Add margin container for content
+		var margin = MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 15)
+		margin.add_theme_constant_override("margin_top", 15)
+		margin.add_theme_constant_override("margin_right", 15)
+		margin.add_theme_constant_override("margin_bottom", 15)
+		card.add_child(margin)
+		
+		# Add vertical layout for card content
+		var card_content = VBoxContainer.new()
+		margin.add_child(card_content)
+		
+		# Add header with icon 
+		var header_panel = PanelContainer.new()
+		var header_style = StyleBoxFlat.new()
+		header_style.bg_color = upgrade.icon_color.darkened(0.5)
+		header_style.border_width_left = 2
+		header_style.border_width_top = 2
+		header_style.border_width_right = 2
+		header_style.border_width_bottom = 2
+		header_style.border_color = upgrade.icon_color
+		header_style.corner_radius_top_left = 10
+		header_style.corner_radius_top_right = 10
+		header_style.corner_radius_bottom_left = 10
+		header_style.corner_radius_bottom_right = 10
+		header_panel.add_theme_stylebox_override("panel", header_style)
+		header_panel.custom_minimum_size = Vector2(0, 100)
+		card_content.add_child(header_panel)
+		
+		# Create icon container
+		var icon_container = CenterContainer.new()
+		header_panel.add_child(icon_container)
+		
+		# Create icon using TextureRect with custom textures
+		var icon = TextureRect.new()
+		icon.custom_minimum_size = Vector2(70, 70)
+		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		
+		# Create different icons based on upgrade type
+		var icon_texture
+		match upgrade.type:
+			"max_health":
+				icon_texture = create_heart_icon(upgrade.icon_color)
+			"damage":
+				icon_texture = create_sword_icon(upgrade.icon_color)
+			"speed":
+				icon_texture = create_lightning_icon(upgrade.icon_color)
+			"add_weapon", "upgrade_weapon":
+				icon_texture = create_star_icon(upgrade.icon_color)
+			_:
+				icon_texture = create_generic_icon(upgrade.icon_color)
+		
+		icon.texture = icon_texture
+		icon_container.add_child(icon)
+		
+		# Add title with better styling
+		var title_box = PanelContainer.new()
+		var title_box_style = StyleBoxFlat.new()
+		title_box_style.bg_color = Color(0.1, 0.1, 0.1, 0.7)
+		title_box_style.border_width_left = 1
+		title_box_style.border_width_top = 1
+		title_box_style.border_width_right = 1
+		title_box_style.border_width_bottom = 1
+		title_box_style.border_color = upgrade.icon_color.darkened(0.3)
+		title_box_style.corner_radius_top_left = 5
+		title_box_style.corner_radius_top_right = 5
+		title_box_style.corner_radius_bottom_left = 5
+		title_box_style.corner_radius_bottom_right = 5
+		title_box.add_theme_stylebox_override("panel", title_box_style)
+		card_content.add_child(title_box)
+		
+		var card_title_margin = MarginContainer.new()
+		card_title_margin.add_theme_constant_override("margin_left", 10)
+		card_title_margin.add_theme_constant_override("margin_right", 10)
+		card_title_margin.add_theme_constant_override("margin_top", 5)
+		card_title_margin.add_theme_constant_override("margin_bottom", 5)
+		title_box.add_child(card_title_margin)
+		
+		var card_title = Label.new()
+		card_title.text = upgrade.name.to_upper()
+		card_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card_title.add_theme_font_size_override("font_size", 18)
+		card_title.add_theme_color_override("font_color", upgrade.icon_color)
+		card_title_margin.add_child(card_title)
+		
+		# Add small spacer
+		var mini_spacer = Control.new()
+		mini_spacer.custom_minimum_size = Vector2(0, 10)
+		card_content.add_child(mini_spacer)
+		
+		# Add description with better styling
+		var desc_panel = PanelContainer.new()
+		var desc_style = StyleBoxFlat.new()
+		desc_style.bg_color = Color(0.1, 0.1, 0.15, 0.6)
+		desc_style.corner_radius_top_left = 5
+		desc_style.corner_radius_top_right = 5
+		desc_style.corner_radius_bottom_left = 5
+		desc_style.corner_radius_bottom_right = 5
+		desc_panel.add_theme_stylebox_override("panel", desc_style)
+		desc_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		card_content.add_child(desc_panel)
+		
+		var desc_margin = MarginContainer.new()
+		desc_margin.add_theme_constant_override("margin_left", 10)
+		desc_margin.add_theme_constant_override("margin_right", 10)
+		desc_margin.add_theme_constant_override("margin_top", 5)
+		desc_margin.add_theme_constant_override("margin_bottom", 5)
+		desc_panel.add_child(desc_margin)
+		
+		var description = Label.new()
+		description.text = upgrade.description
+		description.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		description.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		description.add_theme_font_size_override("font_size", 14)
+		description.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		description.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		desc_margin.add_child(description)
+		
+		# Add small spacer
+		var mini_spacer2 = Control.new()
+		mini_spacer2.custom_minimum_size = Vector2(0, 10)
+		card_content.add_child(mini_spacer2)
+		
+		# Add select button with better styling
+		var button_panel = PanelContainer.new()
+		var button_style = StyleBoxFlat.new()
+		button_style.bg_color = upgrade.icon_color.darkened(0.4)
+		button_style.border_width_left = 2
+		button_style.border_width_top = 2
+		button_style.border_width_right = 2
+		button_style.border_width_bottom = 2
+		button_style.border_color = upgrade.icon_color.darkened(0.2)
+		button_style.corner_radius_top_left = 10
+		button_style.corner_radius_top_right = 10
+		button_style.corner_radius_bottom_left = 10
+		button_style.corner_radius_bottom_right = 10
+		button_panel.add_theme_stylebox_override("panel", button_style)
+		card_content.add_child(button_panel)
+		
+		var select_button = Button.new()
+		select_button.text = "SELECT"
+		select_button.flat = true
+		select_button.custom_minimum_size = Vector2(0, 40)
+		
+		# Style the button
+		select_button.add_theme_font_size_override("font_size", 18)
+		select_button.add_theme_color_override("font_color", Color(1, 1, 1))
+		select_button.add_theme_color_override("font_hover_color", Color(1, 1, 1))
+		select_button.add_theme_color_override("font_focus_color", Color(1, 1, 1))
+		select_button.add_theme_color_override("font_pressed_color", upgrade.icon_color.darkened(0.2))
+		button_panel.add_child(select_button)
+		
+		# Connect button press to apply upgrade
+		select_button.pressed.connect(func():
+			apply_upgrade(upgrade.type, upgrade.value)
+			
+			# Play sound effect if available
+			if audio_player:
+				audio_player.pitch_scale = 0.8
+				audio_player.play()
+			
+			# Apply powerful visual effect on selection
+			var flash = ColorRect.new()
+			flash.color = upgrade.icon_color
+			flash.color.a = 0.0
+			flash.anchors_preset = Control.PRESET_FULL_RECT
+			canvas_layer.add_child(flash)
+			
+			var flash_tween = create_tween()
+			
+			flash_tween.tween_property(flash, "color:a", 0.7, 0.2)
+			flash_tween.tween_property(flash, "color:a", 0.0, 0.5)
+			flash_tween.tween_callback(func(): 
+				canvas_layer.queue_free()
+				get_tree().paused = false
+			)
+		)
+		
+		options_container.add_child(card_container)
+		
+		# Create card hover effects
+		card.mouse_entered.connect(func():
+			var hover_tween = create_tween()
+			hover_tween.tween_property(card_container, "position:y", -15, 0.2).set_ease(Tween.EASE_OUT)
+			
+			# Intensify glow
+			var glow_tween = create_tween()
+			glow_tween.tween_property(card_style, "border_width_left", 4, 0.2)
+			glow_tween.parallel().tween_property(card_style, "border_width_top", 4, 0.2)
+			glow_tween.parallel().tween_property(card_style, "border_width_right", 4, 0.2)
+			glow_tween.parallel().tween_property(card_style, "border_width_bottom", 4, 0.2)
+			glow_tween.parallel().tween_property(card_style, "shadow_size", 10, 0.2)
+			
+			# Update button style
+			button_style.bg_color = upgrade.icon_color.darkened(0.2)
+		)
+		
+		card.mouse_exited.connect(func():
+			var exit_tween = create_tween()
+			exit_tween.tween_property(card_container, "position:y", 0, 0.2).set_ease(Tween.EASE_IN)
+			
+			# Reset glow
+			var glow_tween = create_tween()
+			glow_tween.tween_property(card_style, "border_width_left", 3, 0.2)
+			glow_tween.parallel().tween_property(card_style, "border_width_top", 3, 0.2)
+			glow_tween.parallel().tween_property(card_style, "border_width_right", 3, 0.2)
+			glow_tween.parallel().tween_property(card_style, "border_width_bottom", 3, 0.2)
+			glow_tween.parallel().tween_property(card_style, "shadow_size", 6, 0.2)
+			
+			# Reset button style
+			button_style.bg_color = upgrade.icon_color.darkened(0.4)
+		)
+	
+	# Add animated particles at the bottom
+	var particles_container = Control.new()
+	particles_container.custom_minimum_size = Vector2(0, 50)
+	container.add_child(particles_container)
+	
+	var bottom_particles = CPUParticles2D.new()
+	bottom_particles.amount = 30
+	bottom_particles.lifetime = 2.0
+	bottom_particles.explosiveness = 0.0
+	bottom_particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	bottom_particles.emission_rect_extents = Vector2(350, 10)
+	bottom_particles.direction = Vector2(0, -1)
+	bottom_particles.spread = 30
+	bottom_particles.gravity = Vector2(0, -20)
+	bottom_particles.initial_velocity_min = 10
+	bottom_particles.initial_velocity_max = 30
+	bottom_particles.scale_amount_min = 1.0
+	bottom_particles.scale_amount_max = 3.0
+	bottom_particles.color = Color(0.6, 0.4, 1.0, 0.3)
+	bottom_particles.position = Vector2(350, 25)
+	particles_container.add_child(bottom_particles)
+	
+	# Dramatic entrance animation
+	container.scale = Vector2(0.5, 0.5)
+	container.modulate = Color(1, 1, 1, 0)
+	
+	var entrance_tween = create_tween()
+	entrance_tween.tween_property(container, "scale", Vector2(1.1, 1.1), 0.5).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	entrance_tween.tween_property(container, "scale", Vector2(1.0, 1.0), 0.3).set_ease(Tween.EASE_IN_OUT)
+	
+	var fade_tween = create_tween()
+	fade_tween.tween_property(container, "modulate", Color(1, 1, 1, 1), 0.7)
+	
+	# Store reference to menu and pause game
+	upgrade_menu_instance = canvas_layer
+	get_tree().paused = true
+	
+	# Add to scene
+	get_tree().root.add_child(canvas_layer)
+	
+	return canvas_layer
+
+# Create a fancy grid background
+func create_grid_background() -> Control:
+	var control = Control.new()
+	
+	# Create parent node with drawing functionality
+	var grid_node = Node2D.new()
+	control.add_child(grid_node)
+	
+	# Connect the draw signal to avoid drawing outside _draw() 
+	grid_node.connect("draw", grid_draw_function)
+	
+	# Setup the control to fill the screen
+	control.custom_minimum_size = get_viewport_rect().size
+	
+	return control
+
+# Function that will be called during the draw cycle
+func grid_draw_function(node):
+	# Grid properties
+	var cell_size = 50
+	var viewport_size = get_viewport_rect().size
+	var grid_color = Color(0.4, 0.2, 0.6, 0.2)
+	
+	# Draw horizontal lines
+	for y in range(0, int(viewport_size.y) + cell_size, cell_size):
+		node.draw_line(Vector2(0, y), Vector2(viewport_size.x, y), grid_color, 1.0)
+	
+	# Draw vertical lines
+	for x in range(0, int(viewport_size.x) + cell_size, cell_size):
+		node.draw_line(Vector2(x, 0), Vector2(x, viewport_size.y), grid_color, 1.0)
+
+# Create textures for the icons using proper generation methods
+func create_heart_icon(color: Color) -> Texture2D:
+	# Create an image with transparent background
+	var img = Image.create(100, 100, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	
+	# Create a heart shape
+	var center_x = 50
+	var center_y = 50
+	var size = 40
+	
+	# Draw the heart using proper methods
+	for x in range(100):
+		for y in range(100):
+			var dx = (x - center_x) / size
+			var dy = (y - center_y) / size
+			
+			# Heart formula
+			if (pow(dx, 2) + pow(dy - 0.35, 2) * 1.3 < 0.5) or \
+			   (pow(dx - 0.5, 2) + pow(dy + 0.25, 2) < 0.3) or \
+			   (pow(dx + 0.5, 2) + pow(dy + 0.25, 2) < 0.3):
+				img.set_pixel(x, y, color)
+	
+	# Create an ImageTexture from the image
+	var texture = ImageTexture.create_from_image(img)
+	return texture
+
+func create_sword_icon(color: Color) -> Texture2D:
+	# Create an image with transparent background
+	var img = Image.create(100, 100, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	
+	# Create a sword shape
+	var center_x = 50
+	var center_y = 50
+	
+	# Draw the sword blade
+	for y in range(20, 80):
+		var blade_width = 6 if y > 65 else 3
+		for x in range(center_x - blade_width, center_x + blade_width):
+			img.set_pixel(x, y, color)
+	
+	# Draw the sword handle
+	for y in range(70, 85):
+		for x in range(center_x - 15, center_x + 15):
+			if x > center_x - 15 and x < center_x + 15 and y > 70 and y < 80:
+				img.set_pixel(x, y, color.darkened(0.3))
+	
+	# Draw the sword guard
+	for y in range(65, 72):
+		for x in range(center_x - 15, center_x + 15):
+			img.set_pixel(x, y, color.lightened(0.2))
+	
+	# Create an ImageTexture from the image
+	var texture = ImageTexture.create_from_image(img)
+	return texture
+
+func create_lightning_icon(color: Color) -> Texture2D:
+	# Create an image with transparent background
+	var img = Image.create(100, 100, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	
+	# Lightning bolt points
+	var points = [
+		Vector2(45, 20),
+		Vector2(60, 40),
+		Vector2(50, 45),
+		Vector2(65, 70),
+		Vector2(55, 75),
+		Vector2(70, 95),
+		Vector2(40, 65),
+		Vector2(50, 60),
+		Vector2(35, 35),
+		Vector2(45, 20)
+	]
+	
+	# Fill the lightning bolt
+	for x in range(100):
+		for y in range(100):
+			var point = Vector2(x, y)
+			var inside = Geometry2D.is_point_in_polygon(point, points)
+			if inside:
+				img.set_pixel(x, y, color)
+	
+	# Create an ImageTexture from the image
+	var texture = ImageTexture.create_from_image(img)
+	return texture
+
+func create_star_icon(color: Color) -> Texture2D:
+	# Create an image with transparent background
+	var img = Image.create(100, 100, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	
+	# Star parameters
+	var center_x = 50
+	var center_y = 50
+	var outer_radius = 40
+	var inner_radius = 15
+	var points = 5
+	
+	# Create a star shape
+	var star_points = []
+	for i in range(points * 2):
+		var radius = outer_radius if i % 2 == 0 else inner_radius
+		var angle = i * PI / points
+		star_points.append(Vector2(
+			center_x + cos(angle) * radius,
+			center_y + sin(angle) * radius
+		))
+	
+	# Fill the star
+	for x in range(100):
+		for y in range(100):
+			var point = Vector2(x, y)
+			var inside = Geometry2D.is_point_in_polygon(point, star_points)
+			if inside:
+				img.set_pixel(x, y, color)
+	
+	# Create an ImageTexture from the image
+	var texture = ImageTexture.create_from_image(img)
+	return texture
+
+func create_generic_icon(color: Color) -> Texture2D:
+	# Create an image with transparent background
+	var img = Image.create(100, 100, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	
+	# Create a diamond shape
+	var center_x = 50
+	var center_y = 50
+	var size = 35
+	
+	# Create diamond points
+	var diamond_points = [
+		Vector2(center_x, center_y - size),
+		Vector2(center_x + size, center_y),
+		Vector2(center_x, center_y + size),
+		Vector2(center_x - size, center_y)
+	]
+	
+	# Fill the diamond
+	for x in range(100):
+		for y in range(100):
+			var point = Vector2(x, y)
+			var inside = Geometry2D.is_point_in_polygon(point, diamond_points)
+			if inside:
+				img.set_pixel(x, y, color)
+	
+	# Create an ImageTexture from the image
+	var texture = ImageTexture.create_from_image(img)
+	return texture
+
+# This shows how to trigger the menu - could be called when player levels up
+func trigger_upgrade_menu():
+	if is_dead:
+		return
+		
+	# Create upgrade options
+	var upgrades = [
+		{
+			"type": "max_health",
+			"value": 20,
+			"name": "Max Health",
+			"description": "Increase maximum health by 20",
+			"icon_color": Color(1.0, 0.3, 0.3)
+		},
+		{
+			"type": "damage",
+			"value": 10,
+			"name": "Attack Power",
+			"description": "Increase melee damage by 10",
+			"icon_color": Color(1.0, 0.7, 0.2)
+		},
+		{
+			"type": "speed",
+			"value": 30,
+			"name": "Movement Speed",
+			"description": "Increase movement speed by 30",
+			"icon_color": Color(0.2, 0.8, 0.6)
+		},
+		{
+			"type": "fire_rate",
+			"value": 0.05,
+			"name": "Attack Speed",
+			"description": "Increase firing rate by 5%",
+			"icon_color": Color(0.3, 0.3, 1.0)
+		}
+	]
+	
+	# Add weapon options based on what player has
+	for weapon_type in weapon_types.keys():
+		if not active_weapons.has(weapon_type):
+			upgrades.append({
+				"type": "add_weapon",
+				"value": weapon_type,
+				"name": weapon_types[weapon_type].name,
+				"description": "New weapon: " + weapon_types[weapon_type].name,
+				"icon_color": weapon_types[weapon_type].color
+			})
+		else:
+			upgrades.append({
+				"type": "upgrade_weapon",
+				"value": weapon_type,
+				"name": "Upgrade " + weapon_types[weapon_type].name,
+				"description": "Increase level of " + weapon_types[weapon_type].name,
+				"icon_color": weapon_types[weapon_type].color
+			})
+	
+	# Shuffle and select random upgrades
+	upgrades.shuffle()
+	var display_upgrades = upgrades.slice(0, min(3, upgrades.size()))
+	
+	# Show the menu
+	show_upgrade_menu(display_upgrades)
+
+# Add this to emit_signal("player_level_up") handler
+func _on_player_level_up(level):
+	trigger_upgrade_menu()
+
+# Connect the level up signal in _ready()
+func _on_level_up(level):
+	trigger_upgrade_menu()

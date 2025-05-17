@@ -10,7 +10,7 @@ void fragment() {
 	   and remove the line that set color.*/
 	// vec4 color = texture(TEXTURE, UV);
 	vec4 color = poly_color; // TO BE REMOVED
-	
+
 	color.rgb = mix(color.rgb, flash_color.rgb, flash_modifier);
 	COLOR = color;
 }

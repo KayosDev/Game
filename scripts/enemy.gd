@@ -552,6 +552,16 @@ func get_hit(damage: int, bullet_trans: Transform2D):
 	
 	health -= damage
 	
+	# Ultra-satisfying hit effects
+	# Add a brief pause on hit for impact feel
+	Engine.time_scale = 0.8
+	var time_scale_timer = Timer.new()
+	time_scale_timer.wait_time = 0.05
+	time_scale_timer.one_shot = true
+	time_scale_timer.autostart = true
+	get_tree().root.add_child(time_scale_timer)
+	time_scale_timer.timeout.connect(func(): Engine.time_scale = 1.0)
+	
 	# Update health bar
 	if health_bar:
 		health_bar.value = health
@@ -559,85 +569,187 @@ func get_hit(damage: int, bullet_trans: Transform2D):
 		is_health_bar_visible = true
 		health_bar_visible_timer = 3.0 # Show health bar for 3 seconds
 	
-	# Display damage text with animation - optimized
+	# Display damage text with animation - enhanced
 	damage_text.text = str(damage)
 	if is_critical:
 		damage_text.text += "!"
 		damage_text.add_theme_color_override("font_color", Color(1.0, 0.1, 0.1))
+		# Make critical hits larger
+		damage_text.add_theme_font_size_override("font_size", 28)
+		# Add screen shake on critical hits
+		if get_parent() and get_parent().has_method("apply_screen_shake"):
+			get_parent().apply_screen_shake(15.0, 0.25)
 	else:
 		damage_text.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
+		damage_text.add_theme_font_size_override("font_size", 24)
 	
 	damage_text.visible = true
 	animation_tree['parameters/conditions/is_damaged'] = true
 	
-	# Simple animation instead of tween for better performance
-	damage_text.get_parent().position = Vector2(0, -40)
+	# Enhanced damage text animation
+	var text_parent = damage_text.get_parent()
+	text_parent.position = Vector2(0, -40)
 	
-	# Optimize push effect
+	# Create fancy damage text tween
+	var tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
+	tween.tween_property(text_parent, "position:y", -80, 0.5)
+	tween.parallel().tween_property(damage_text, "modulate:a", 0, 0.5)
+	
+	# Enemy visual reaction (scale squish)
+	var hit_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
+	hit_tween.tween_property(self, "scale", Vector2(1.2, 0.8), 0.1)
+	hit_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.3)
+	
+	# Optimize push effect - with directional impact
 	set_push(Vector2.RIGHT.rotated(bullet_trans.get_rotation()), recoil_strength, 0.2)
+	
+	# Spawn directional impact particles
+	var impact_dir = Vector2.RIGHT.rotated(bullet_trans.get_rotation())
+	add_hit_particles(bullet_trans)
 	
 	# Check if dead
 	if health <= 0:
 		animation_tree['parameters/conditions/is_destroyed'] = true
 		
+		# Dramatic death pause - more extreme for powerful enemies
+		var death_slowdown = 0.1
+		if enemy_type == "Boss" or enemy_type == "Tank":
+			death_slowdown = 0.05
+		Engine.time_scale = death_slowdown
+		var death_timer = Timer.new()
+		death_timer.wait_time = 0.08
+		death_timer.one_shot = true
+		death_timer.autostart = true
+		get_tree().root.add_child(death_timer)
+		death_timer.timeout.connect(func(): Engine.time_scale = 1.0)
+		
 		# Do splitter special case
 		if enemy_type == "Splitter" and !children_spawned:
 			call_deferred("spawn_mini_splitters")
 		
-		# Small screen shake on death only
+		# Enhanced screen shake on death
 		if get_parent() and get_parent().has_method("apply_screen_shake"):
-			get_parent().apply_screen_shake(8.0, 0.2)
+			# More shake for larger enemies
+			var shake_amount = 12.0
+			if enemy_type == "Tank":
+				shake_amount = 20.0
+			elif enemy_type == "Boss":
+				shake_amount = 30.0
+			get_parent().apply_screen_shake(shake_amount, 0.3)
+			
+		# Add immediate short pre-death animation
+		var pre_death_tween = create_tween().set_ease(Tween.EASE_IN)
+		pre_death_tween.tween_property(self, "scale", Vector2(1.4, 1.4), 0.15)
+		pre_death_tween.parallel().tween_property(self, "modulate", Color(1.5, 1.5, 1.5, 1.0), 0.15)
+		pre_death_tween.tween_callback(func(): create_death_explosion())
+		
+		# Queue free with slight delay for better visual
+		var destroy_timer = Timer.new()
+		destroy_timer.wait_time = 0.2
+		destroy_timer.one_shot = true
+		destroy_timer.autostart = true
+		add_child(destroy_timer)
+		destroy_timer.timeout.connect(destroy)
 
-func create_death_explosion():
-	# Create simplified death effect to reduce lag
-	var particles = CPUParticles2D.new()
-	particles.position = global_position
-	particles.amount = 10 # Reduced from 30
-	particles.lifetime = 0.6
-	particles.explosiveness = 1.0
-	particles.direction = Vector2(0, 0)
-	particles.spread = 180
-	particles.gravity = Vector2(0, 200)
-	particles.initial_velocity_min = 80
-	particles.initial_velocity_max = 160
-	particles.scale_amount_min = 4
-	particles.scale_amount_max = 8
+func add_hit_particles(bullet_trans):
+	# Add directional hit particles
+	var impact_dir = Vector2.RIGHT.rotated(bullet_trans.get_rotation())
 	
-	# Set color based on enemy type
+	# Create impact particles in the bullet's direction
+	var particles = CPUParticles2D.new()
+	particles.amount = 10
+	particles.lifetime = 0.3
+	particles.explosiveness = 1.0
+	particles.direction = -impact_dir
+	particles.spread = 30
+	particles.gravity = Vector2(0, 200)
+	particles.initial_velocity_min = 50
+	particles.initial_velocity_max = 120
+	particles.scale_amount_min = 2
+	particles.scale_amount_max = 4
+	
+	# Color based on enemy type
 	match enemy_type:
 		"Fast":
-			particles.color = Color(0.2, 0.7, 0.2)  # Green
+			particles.color = Color(0.3, 0.7, 0.9)
 		"Tank":
-			particles.color = Color(0.2, 0.2, 0.8)  # Blue
+			particles.color = Color(0.3, 0.3, 0.9)
+		"Ranged":
+			particles.color = Color(0.8, 0.8, 0.2) 
+		"Exploder":
+			particles.color = Color(1.0, 0.5, 0.0)
 		"Splitter":
-			particles.color = Color(0.8, 0.6, 0.2)  # Orange
+			particles.color = Color(0.8, 0.3, 0.8)
+		"Boss":
+			particles.color = Color(1.0, 0.1, 0.1)
 		_:
-			particles.color = Color(0.8, 0.2, 0.2)  # Default red
+			particles.color = Color(0.8, 0.2, 0.2)
 	
 	particles.emitting = true
 	particles.one_shot = true
-	get_tree().root.call_deferred("add_child", particles)
 	
-	# Auto-clean up
+	# Position slightly in front of impact point
+	particles.position = global_position - (impact_dir * 10)
+	get_tree().root.add_child(particles)
+	
+	# Auto-remove when done
 	var timer = Timer.new()
-	timer.wait_time = 0.7
+	timer.wait_time = 1.0
 	timer.one_shot = true
 	timer.autostart = true
 	particles.add_child(timer)
 	timer.timeout.connect(func(): particles.queue_free())
-	
-	# Remove slow-motion effect to prevent stutter
-	# Engine.time_scale = 1.0 // We're not using slow-motion anymore
 
-# Completely disable visual effects that aren't essential
-func create_shield_break_effect():
-	pass
+func create_death_explosion():
+	# Create enhanced physics-based death particles
+	var physics_particles = load("res://scenes/physics_death_particles.tscn").instantiate()
+	physics_particles.global_position = global_position
+	physics_particles.set_particle_color(enemy_type)
 	
-func add_hit_particles(bullet_trans):
-	pass
+	# Only apply dramatic effects 10% of the time
+	physics_particles.impact_freeze = randf() < 0.1
 	
-func create_blood_stain():
-	pass
+	# Scale particles based on enemy type
+	if enemy_type == "Boss":
+		physics_particles.particle_count = 60
+		physics_particles.min_size = 5.0
+		physics_particles.max_size = 15.0
+		# Always do slow-mo for bosses
+		physics_particles.impact_freeze = true
+	elif enemy_type == "Tank":
+		physics_particles.particle_count = 40
+		physics_particles.min_size = 4.0
+		physics_particles.max_size = 12.0
+	
+	# Add dramatic pulsing light at explosion center
+	var light_center = Node2D.new()
+	light_center.position = global_position
+	var light_sprite = Polygon2D.new()
+	
+	# Create circle shape
+	var points = PackedVector2Array()
+	var segments = 16
+	var light_radius = 20
+	for i in range(segments):
+		var angle = TAU * i / segments
+		points.append(Vector2(cos(angle), sin(angle)) * light_radius)
+	
+	light_sprite.polygon = points
+	light_sprite.color = Color(1.0, 0.7, 0.3, 0.7)
+	light_center.add_child(light_sprite)
+	
+	# Pulsing light animation
+	var light_tween = create_tween()
+	light_tween.tween_property(light_sprite, "scale", Vector2(3, 3), 0.2)
+	light_tween.parallel().tween_property(light_sprite, "color:a", 0.0, 0.4)
+	light_tween.tween_callback(func(): light_center.queue_free())
+	
+	# Add explosion elements to scene
+	get_tree().root.call_deferred("add_child", physics_particles)
+	get_tree().root.call_deferred("add_child", light_center)
+	
+	# Add dramatic sound based on enemy type
+	# (Sound would be implemented here)
 
 func destroy():
 	enemy_destroyed.emit(self)
