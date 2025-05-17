@@ -1,0 +1,28 @@
+[gd_scene load_steps=2 format=3 uid="uid://x71qiw8u3ow3"]
+
+[sub_resource type="GDScript" id="GDScript_etvp4"]
+script/source = "extends Node2D
+
+# Blood stain has no behavior, it just stays on the ground where enemies die
+# Can be removed if there are too many stains using the clean_blood_stains function in game.gd
+
+func _ready():
+	# Add to blood_stains group for cleanup management
+	add_to_group(\"blood_stains\")
+	
+	# Set a very low z-index so the stain appears below everything else
+	z_index = -48
+	
+	# Optional: Fade out after a long time
+	# var tween = create_tween()
+	# tween.tween_property(self, \"modulate:a\", 0.0, 30.0)
+	# tween.tween_callback(queue_free)
+"
+
+[node name="BloodStain" type="Node2D"]
+script = SubResource("GDScript_etvp4")
+
+[node name="Polygon2D" type="Polygon2D" parent="."]
+z_index = -48
+color = Color(0.631373, 0.121569, 0.121569, 0.686275)
+polygon = PackedVector2Array(-25, -9, -16, -18, -4, -24, 6, -24, 14, -15, 23, -12, 27, -2, 24, 9, 12, 18, -1, 21, -13, 17, -21, 8, -27, 2) 
