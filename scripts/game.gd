@@ -24,6 +24,10 @@ var spawn_timer: float = 0.0
 var game_time: float = 0.0 # Time elapsed since game start
 var current_difficulty: float = 1.0 # Scales with game time
 
+# Keep track of enemies pending for spawn
+var pending_enemies = []
+var max_enemies_per_frame = 3
+
 @onready var camera: Camera2D = $Camera2D
 @onready var enemy_class = preload("res://scenes/enemy.tscn")
 @onready var player: CharacterBody2D = $Player
@@ -84,6 +88,23 @@ func _process(delta: float):
 		spawn_timer = spawn_interval / sqrt(current_difficulty)
 	
 	shake_camera(delta)
+	
+	# Process any pending enemy spawns
+	process_pending_enemies()
+
+func process_pending_enemies():
+	# Spawn a limited number of enemies per frame
+	var spawned = 0
+	while not pending_enemies.is_empty() and spawned < max_enemies_per_frame:
+		var enemy_data = pending_enemies.pop_front()
+		add_enemy_to_scene(enemy_data.enemy, enemy_data.pos)
+		spawned += 1
+
+func add_enemy_to_scene(enemy, pos):
+	# Add the enemy to the scene safely
+	enemy.setup(pos, player)
+	get_tree().root.call_deferred("add_child", enemy)
+	enemy_list.append(enemy)
 
 func spawn_enemy():
 	var enemy = enemy_class.instantiate()
@@ -132,9 +153,9 @@ func spawn_enemy():
 			enemy_type = "Fast"
 	
 	enemy.enemy_type = enemy_type
-	enemy.setup(pos, player)
-	get_tree().root.add_child(enemy)
-	enemy_list.append(enemy)
+	
+	# Add to pending enemies instead of spawning immediately
+	pending_enemies.append({"enemy": enemy, "pos": pos})
 
 func shake_camera(delta: float):
 	# Fade out the intensity over time

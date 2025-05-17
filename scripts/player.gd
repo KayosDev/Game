@@ -5,6 +5,7 @@ signal player_damaged(amount)
 signal player_healed(amount)
 signal player_level_up(level)
 signal weapon_added(weapon_type)
+signal pause_toggled(is_paused)
 
 @export var speed: float = 360.0
 @export var lr_flag: bool = true # Enable body left right animation
@@ -127,6 +128,12 @@ var orbital_timer = 0.0
 # No preload since we'll create it dynamically
 var death_message_instance = null
 
+# This goes with the other variables
+var pause_menu_scene = preload("res://scenes/pause_menu.tscn")
+var pause_menu_instance = null
+var post_processing_scene = preload("res://scenes/post_processing.tscn")
+var post_processing_instance = null
+
 func _ready():
 	screen_size = get_viewport_rect().size
 	hide()
@@ -191,6 +198,14 @@ func _ready():
 	
 	# Player starts with only the basic left-click weapon
 	# No additional weapons until unlocked by the player
+
+	# Setup pause menu
+	pause_menu_instance = pause_menu_scene.instantiate()
+	add_child(pause_menu_instance)
+	pause_menu_instance.visible = false
+	
+	# Setup post-processing effects
+	setup_post_processing()
 
 # Create all melee components dynamically
 func setup_melee_components():
@@ -377,6 +392,12 @@ func _physics_process(delta):
 func _input(event):
 	if is_dead:
 		return
+	
+	# Toggle pause on Escape key press	
+	if event.is_action_pressed("ui_cancel"):
+		var is_paused = pause_menu_instance.toggle_pause()
+		emit_signal("pause_toggled", is_paused)
+		return
 		
 	if event is InputEventMouseMotion:
 		update_body_rotate(event.position)
@@ -498,6 +519,12 @@ func shoot():
 	if audio_player:
 		audio_player.play()
 		audio_player.pitch_scale = randf_range(0.9, 1.1)
+		
+	# Add post-processing flash effect
+	if post_processing_instance and is_instance_valid(post_processing_instance):
+		post_processing_instance.increase_intensity(0.15, 0.3)
+		post_processing_instance.add_light_flash(bullet_spawn_pos.global_position, 
+			Color(1.0, 0.7, 0.2, 0.8), 0.4)
 
 func set_push(dir: Vector2, strength: float, timer: float):
 	push_dir = dir
@@ -536,6 +563,14 @@ func take_damage(amount: int):
 	# Apply strong push effect when damaged
 	var random_dir = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
 	set_push(random_dir, hit_recoil_strength, 0.3) # Increased duration too
+	
+	# Add post-processing damage effects
+	if post_processing_instance and is_instance_valid(post_processing_instance):
+		# Intensify effects when taking damage
+		post_processing_instance.increase_intensity(0.4, 0.5)
+		# Add red flash at the player position
+		post_processing_instance.add_light_flash(global_position, 
+			Color(1.0, 0.1, 0.1, 0.9), 0.7)
 	
 	# Check if player is dead
 	if health <= 0:
@@ -582,72 +617,16 @@ func die():
 	# Stop movement and disable controls
 	velocity = Vector2.ZERO
 	
+	# Add dramatic post-processing death effects
+	if post_processing_instance and is_instance_valid(post_processing_instance):
+		# Maximum intensity for death
+		post_processing_instance.set_intensity(2.0)
+		# Add dramatic light flash
+		post_processing_instance.add_light_flash(global_position, 
+			Color(1.0, 0.0, 0.0, 1.0), 3.0)
+	
 	# Emit death signal
 	emit_signal("player_died")
-	
-	# Schedule return to normal time
-	var timer = Timer.new()
-	timer.one_shot = true
-	timer.wait_time = death_slowmo_duration * death_slowmo_factor # Adjusted for slowmo
-	timer.timeout.connect(_on_death_slowmo_timeout)
-	add_child(timer)
-	timer.start()
-	
-	# Create death message if it doesn't exist
-	if death_message_instance == null:
-		death_message_instance = create_death_message()
-	
-	# Add to scene if valid
-	if death_message_instance:
-		get_tree().root.add_child(death_message_instance)
-		print("Death menu added to scene tree")
-
-func create_death_message():
-	# Create a death message canvas layer
-	var canvas_layer = CanvasLayer.new()
-	canvas_layer.layer = 10
-	canvas_layer.name = "DeathMessageLayer"
-	
-	# Create background
-	var background = ColorRect.new()
-	background.color = Color(0, 0, 0, 0.5)
-	background.anchors_preset = Control.PRESET_FULL_RECT
-	canvas_layer.add_child(background)
-	
-	# Create container
-	var container = VBoxContainer.new()
-	container.anchors_preset = Control.PRESET_CENTER
-	container.size = Vector2(500, 300)
-	container.position = Vector2(-250, -150)
-	canvas_layer.add_child(container)
-	
-	# Death message
-	var message = Label.new()
-	message.text = "YOU DIED"
-	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message.add_theme_font_size_override("font_size", 72)
-	message.add_theme_color_override("font_color", Color(0.9, 0.2, 0.2))
-	container.add_child(message)
-	
-	# Spacing
-	var spacer = Control.new()
-	spacer.custom_minimum_size = Vector2(0, 50)
-	container.add_child(spacer)
-	
-	# Restart instruction
-	var restart_label = Label.new()
-	restart_label.text = "Press SPACE or R to restart"
-	restart_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	restart_label.add_theme_font_size_override("font_size", 32)
-	container.add_child(restart_label)
-	
-	# Animate the death menu
-	animate_death_menu(container, background)
-	
-	# Add blood effects
-	add_blood_effects(canvas_layer)
-	
-	return canvas_layer
 
 func animate_death_menu(container, background):
 	# Start with everything transparent
@@ -724,52 +703,174 @@ func show_start_menu():
 	canvas_layer.layer = 10
 	canvas_layer.name = "StartMenuLayer"
 	
-	# Create background
+	# Create animated background with gradient
 	var background = ColorRect.new()
-	background.color = Color(0, 0, 0, 0.8)
+	background.color = Color(0.05, 0.0, 0.12, 0.9) # Dark purple background
 	background.anchors_preset = Control.PRESET_FULL_RECT
 	canvas_layer.add_child(background)
 	
-	# Create container
+	# Add particle effect for background
+	var bg_particles = CPUParticles2D.new()
+	bg_particles.amount = 100
+	bg_particles.lifetime = 4.0
+	bg_particles.explosiveness = 0.0
+	bg_particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	bg_particles.emission_rect_extents = Vector2(get_viewport_rect().size.x/2, get_viewport_rect().size.y/2)
+	bg_particles.gravity = Vector2(0, -20)
+	bg_particles.initial_velocity_min = 10
+	bg_particles.initial_velocity_max = 30
+	bg_particles.scale_amount_min = 1.0
+	bg_particles.scale_amount_max = 3.0
+	bg_particles.color = Color(0.6, 0.4, 1.0, 0.3)
+	bg_particles.position = get_viewport_rect().size / 2
+	canvas_layer.add_child(bg_particles)
+	
+	# Create main container
 	var container = VBoxContainer.new()
 	container.anchors_preset = Control.PRESET_CENTER
-	container.size = Vector2(500, 300)
-	container.position = Vector2(-250, -150)
+	container.size = Vector2(600, 400)
+	container.position = Vector2(-300, -200)
 	canvas_layer.add_child(container)
 	
-	# Title
+	# Add "MAIN MENU" text at the top
+	var menu_label = Label.new()
+	menu_label.text = "MAIN MENU"
+	menu_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu_label.add_theme_font_size_override("font_size", 24)
+	menu_label.add_theme_color_override("font_color", Color(0.9, 0.7, 1.0))
+	container.add_child(menu_label)
+	
+	# Add a small separator
+	var separator = ColorRect.new()
+	separator.color = Color(0.6, 0.3, 0.9, 0.6)
+	separator.custom_minimum_size = Vector2(200, 2)
+	separator.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	container.add_child(separator)
+	
+	# Small spacing
+	var small_spacer = Control.new()
+	small_spacer.custom_minimum_size = Vector2(0, 20)
+	container.add_child(small_spacer)
+	
+	# Title with stylish outline effect
+	var title_container = CenterContainer.new()
+	title_container.use_top_left = false
+	container.add_child(title_container)
+	
+	# Shadow/glow effect for title
+	var title_shadow = Label.new()
+	title_shadow.text = "TOPIS"
+	title_shadow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_shadow.add_theme_font_size_override("font_size", 96)
+	title_shadow.add_theme_color_override("font_color", Color(0.6, 0.2, 0.8, 0.6))
+	title_shadow.position = Vector2(4, 4)
+	title_container.add_child(title_shadow)
+	
+	# Main title
 	var title = Label.new()
 	title.text = "TOPIS"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 72)
-	title.add_theme_color_override("font_color", Color(0.9, 0.3, 0.3))
-	container.add_child(title)
+	title.add_theme_font_size_override("font_size", 96)
+	title.add_theme_color_override("font_color", Color(0.9, 0.3, 0.9))
+	title_container.add_child(title)
+	
+	# Add subtitle
+	var subtitle = Label.new()
+	subtitle.text = "THE EPIC SURVIVAL ADVENTURE"
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_font_size_override("font_size", 24)
+	subtitle.add_theme_color_override("font_color", Color(0.9, 0.5, 0.5))
+	container.add_child(subtitle)
 	
 	# Spacing
 	var spacer = Control.new()
 	spacer.custom_minimum_size = Vector2(0, 50)
 	container.add_child(spacer)
 	
+	# Create a stylish button-like frame for the start text
+	var button_frame = ColorRect.new()
+	button_frame.color = Color(0.4, 0.2, 0.6, 0.6)
+	button_frame.custom_minimum_size = Vector2(350, 60)
+	button_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	container.add_child(button_frame)
+	
 	# Start game instruction
 	var start_label = Label.new()
-	start_label.text = "Press SPACE to start game"
+	start_label.text = "PRESS SPACE TO BEGIN"
 	start_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	start_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	start_label.add_theme_font_size_override("font_size", 32)
-	container.add_child(start_label)
+	start_label.add_theme_color_override("font_color", Color(1.0, 0.9, 1.0))
+	start_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	start_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	button_frame.add_child(start_label)
+	
+	# Version info at bottom
+	var version_label = Label.new()
+	version_label.text = "v1.0 - EPIC EDITION"
+	version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	version_label.add_theme_font_size_override("font_size", 16)
+	version_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	version_label.position.y = 50
+	container.add_child(version_label)
 	
 	# Add to scene
 	get_tree().root.add_child(canvas_layer)
 	
-	# Animation
-	container.modulate = Color(1, 1, 1, 0)
-	var tween = create_tween()
-	tween.tween_property(container, "modulate", Color(1, 1, 1, 1), 0.5)
+	# Create dynamic UI elements - rotating stars in the background
+	for i in range(20):
+		var star = Polygon2D.new()
+		var points = []
+		var outer_radius = randf_range(5, 15)
+		var inner_radius = outer_radius * 0.4
+		for j in range(10):
+			var radius = outer_radius if j % 2 == 0 else inner_radius
+			var angle = j * PI / 5
+			points.append(Vector2(cos(angle), sin(angle)) * radius)
+		star.polygon = PackedVector2Array(points)
+		star.color = Color(randf_range(0.7, 1.0), randf_range(0.7, 1.0), randf_range(0.7, 1.0), randf_range(0.4, 0.8))
+		star.position = Vector2(randf_range(0, get_viewport_rect().size.x), randf_range(0, get_viewport_rect().size.y))
+		canvas_layer.add_child(star)
+		
+		# Animate the star
+		var rotation_tween = create_tween()
+		rotation_tween.set_loops()
+		rotation_tween.tween_property(star, "rotation", TAU, randf_range(3.0, 8.0))
+		
+		# Also make it pulse
+		var scale_tween = create_tween()
+		scale_tween.set_loops()
+		scale_tween.tween_property(star, "scale", Vector2(1.5, 1.5), randf_range(1.0, 3.0))
+		scale_tween.tween_property(star, "scale", Vector2(1.0, 1.0), randf_range(1.0, 3.0))
 	
-	# Make start label blink
+	# Dramatic entrance animation
+	container.scale = Vector2(0.5, 0.5)
+	container.modulate = Color(1, 1, 1, 0)
+	
+	var entrance_tween = create_tween()
+	entrance_tween.tween_property(container, "scale", Vector2(1.1, 1.1), 0.5).set_ease(Tween.EASE_OUT)
+	entrance_tween.tween_property(container, "scale", Vector2(1.0, 1.0), 0.3).set_ease(Tween.EASE_IN)
+	
+	var fade_tween = create_tween()
+	fade_tween.tween_property(container, "modulate", Color(1, 1, 1, 1), 0.7)
+	
+	# Title pulsing effect
+	var title_tween = create_tween()
+	title_tween.set_loops()
+	title_tween.tween_property(title, "modulate", Color(1.0, 0.6, 1.0), 2.0)
+	title_tween.tween_property(title, "modulate", Color(1.0, 1.0, 1.0), 2.0)
+	
+	# Make start button pulse with a more dramatic effect
+	var button_tween = create_tween()
+	button_tween.set_loops()
+	button_tween.tween_property(button_frame, "color", Color(0.6, 0.3, 0.9, 0.8), 0.8)
+	button_tween.tween_property(button_frame, "color", Color(0.4, 0.2, 0.6, 0.6), 0.8)
+	
+	# Make start label blink with a cooler effect
 	var blink_tween = create_tween()
 	blink_tween.set_loops()
-	blink_tween.tween_property(start_label, "modulate:a", 0.3, 0.7)
-	blink_tween.tween_property(start_label, "modulate:a", 1.0, 0.7)
+	blink_tween.tween_property(start_label, "modulate:a", 0.7, 0.5)
+	blink_tween.tween_property(start_label, "modulate:a", 1.0, 0.5)
 	
 	return canvas_layer
 
@@ -933,24 +1034,27 @@ func process_melee(delta):
 				melee_hitbox.monitoring = false
 
 func apply_hit_stop():
-	hit_stop_active = true
-	hit_stop_timer = hit_stop_duration
-	Engine.time_scale = 0.05 # Dramatic slow down
-	
-	# Schedule the return to normal time
-	var timer = Timer.new()
-	timer.one_shot = true
-	timer.wait_time = hit_stop_duration * 0.05 # Actual real-time wait
-	timer.timeout.connect(func(): Engine.time_scale = 1.0; hit_stop_active = false)
-	add_child(timer)
-	timer.start()
-	
-	# Play impact effect
-	if melee_impact_effect and melee_hitbox:
-		melee_impact_effect.global_position = melee_hitbox.global_position
-		melee_impact_effect.rotation = melee_angle
-		melee_impact_effect.restart()
-		melee_impact_effect.emitting = true
+	# This function is now disabled to prevent performance drops
+	pass
+	# Original code commented out for reference
+	# hit_stop_active = true
+	# hit_stop_timer = hit_stop_duration
+	# Engine.time_scale = 0.05 # Dramatic slow down
+	# 
+	# # Schedule the return to normal time
+	# var timer = Timer.new()
+	# timer.one_shot = true
+	# timer.wait_time = hit_stop_duration * 0.05 # Actual real-time wait
+	# timer.timeout.connect(func(): Engine.time_scale = 1.0; hit_stop_active = false)
+	# add_child(timer)
+	# timer.start()
+	# 
+	# # Play impact effect
+	# if melee_impact_effect and melee_hitbox:
+	#     melee_impact_effect.global_position = melee_hitbox.global_position
+	#     melee_impact_effect.rotation = melee_angle
+	#     melee_impact_effect.restart()
+	#     melee_impact_effect.emitting = true
 
 func _on_melee_timer_timeout():
 	is_melee_cd = false
@@ -975,15 +1079,14 @@ func _on_melee_hitbox_body_entered(body):
 		# Apply damage to enemy
 		body.get_hit(melee_damage, hit_transform)
 		
-		# Apply hit stop effect
-		apply_hit_stop()
+		# Remove hit stop for better performance
+		# apply_hit_stop()
 		
-		# Visual feedback
+		# Minimal visual feedback
 		if is_instance_valid(melee_impact_effect):
 			melee_impact_effect.global_position = hit_position
-			melee_impact_effect.restart()
 			melee_impact_effect.emitting = true
-			
+		
 		# Check for rare item drop (very low chance - 0.5%)
 		if randf() < 0.005:
 			drop_permanent_upgrade(body.global_position)
@@ -1111,8 +1214,14 @@ func check_orbital_projectile_collisions():
 		
 		var result = space_state.intersect_point(query)
 		
-		# Process collisions
+		# Process collisions - optimize by limiting per frame
+		var hit_count = 0
 		for collision in result:
+			# Limit hits per frame to 2 for better performance
+			hit_count += 1
+			if hit_count > 2:
+				break
+				
 			var collider = collision.collider
 			if is_instance_valid(collider) and collider.is_in_group("enemies") and collider.has_method("get_hit"):
 				# Create transform at hit position
@@ -1124,17 +1233,17 @@ func check_orbital_projectile_collisions():
 				var damage = int(config.damage * (1.0 + (level - 1) * 0.2))
 				collider.get_hit(damage, hit_transform)
 				
-				# Visual effect for hit
+				# Minimal visual effect for hit
 				if melee_impact_effect and is_instance_valid(melee_impact_effect):
 					var effect = melee_impact_effect.duplicate()
 					effect.global_position = bullet.global_position
 					effect.modulate = config.color
 					effect.emitting = true
-					get_tree().root.add_child(effect)
+					get_tree().root.call_deferred("add_child", effect)
 					
 					# Create timer to remove the effect
 					var timer = Timer.new()
-					timer.wait_time = 1.0
+					timer.wait_time = 0.5  # Shorter duration
 					timer.one_shot = true
 					timer.autostart = true
 					effect.add_child(timer)
@@ -1551,3 +1660,17 @@ func set_orbital_mode(value):
 	
 	# Return the script as our bullet "scene"
 	return script
+
+# Add this new function to set up post-processing effects
+func setup_post_processing():
+	# Check if post-processing scene exists
+	if not FileAccess.file_exists("res://scenes/post_processing.tscn"):
+		printerr("Post-processing scene not found!")
+		return
+	
+	# Create post-processing instance and add it to the main scene
+	post_processing_instance = post_processing_scene.instantiate()
+	get_tree().root.add_child(post_processing_instance)
+	
+	# Make sure it's always the last layer for proper rendering
+	post_processing_instance.layer = 10

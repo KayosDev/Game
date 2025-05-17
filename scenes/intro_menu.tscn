@@ -1,0 +1,496 @@
+[gd_scene load_steps=14 format=3 uid="uid://dj4psf8x1aavf"]
+
+[ext_resource type="Script" uid="uid://c2rqk1oqb4bu2" path="res://scripts/intro_menu.gd" id="1_y1fby"]
+
+[sub_resource type="Gradient" id="Gradient_m8l87"]
+offsets = PackedFloat32Array(0, 0.510417, 1)
+colors = PackedColorArray(0.811765, 0.215686, 0.458824, 1, 0.945098, 0.509804, 0.733333, 0.886275, 1, 1, 1, 0)
+
+[sub_resource type="Gradient" id="Gradient_j1qg2"]
+offsets = PackedFloat32Array(0, 0.520833, 1)
+colors = PackedColorArray(0.784314, 0.152941, 0.215686, 1, 0.996078, 0.654902, 0.521569, 1, 1, 1, 1, 0)
+
+[sub_resource type="Gradient" id="Gradient_ekh82"]
+colors = PackedColorArray(0.262745, 0.898039, 0.996078, 1, 0.490196, 0.988235, 1, 0)
+
+[sub_resource type="Gradient" id="Gradient_e4xo1"]
+offsets = PackedFloat32Array(0, 0.283333, 0.7, 1)
+colors = PackedColorArray(0.988235, 0.294118, 0.643137, 1, 0.984314, 0.419608, 0.886275, 0.0823529, 0.403922, 0.286275, 0.784314, 0.0666667, 0.4, 0.843137, 0.980392, 0)
+
+[sub_resource type="Gradient" id="Gradient_jwq75"]
+offsets = PackedFloat32Array(0, 0.2, 0.473684, 0.731579, 1)
+colors = PackedColorArray(0.466667, 0, 0.752941, 1, 0.666667, 0.423529, 0.819608, 1, 0.811765, 0.262745, 0.764706, 1, 0.203922, 0.14902, 0.65098, 1, 0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_4o0mk"]
+bg_color = Color(0.576471, 0.317647, 0.996078, 0.741176)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.909804, 0.662745, 1, 0.694118)
+border_blend = true
+corner_radius_top_left = 15
+corner_radius_top_right = 15
+corner_radius_bottom_right = 15
+corner_radius_bottom_left = 15
+shadow_color = Color(0.172549, 0.0666667, 0.678431, 0.517647)
+shadow_size = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6kxoa"]
+bg_color = Color(0.321569, 0.160784, 0.796078, 0.913725)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.627451, 0.313726, 1, 1)
+border_blend = true
+corner_radius_top_left = 15
+corner_radius_top_right = 15
+corner_radius_bottom_right = 15
+corner_radius_bottom_left = 15
+expand_margin_left = 5.0
+expand_margin_top = 5.0
+expand_margin_right = 5.0
+expand_margin_bottom = 5.0
+shadow_color = Color(0.172549, 0.0666667, 0.678431, 0.878431)
+shadow_size = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_v1wqd"]
+bg_color = Color(0.239216, 0.156863, 0.517647, 0.556863)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.909804, 0.662745, 1, 0.388235)
+border_blend = true
+corner_radius_top_left = 15
+corner_radius_top_right = 15
+corner_radius_bottom_right = 15
+corner_radius_bottom_left = 15
+shadow_color = Color(0.133333, 0.0666667, 0.423529, 0.545098)
+shadow_size = 10
+
+[sub_resource type="LabelSettings" id="LabelSettings_82wc8"]
+font_size = 85
+font_color = Color(1, 0.827451, 0.968627, 1)
+outline_size = 15
+outline_color = Color(0.392157, 0.0862745, 0.701961, 1)
+shadow_size = 15
+shadow_color = Color(0.258824, 0, 0.580392, 0.505882)
+shadow_offset = Vector2(5, 5)
+
+[sub_resource type="LabelSettings" id="LabelSettings_njrcp"]
+font_size = 32
+font_color = Color(0.996078, 0.85098, 1, 1)
+outline_size = 6
+outline_color = Color(0.27451, 0.0705882, 0.462745, 0.643137)
+shadow_size = 8
+shadow_color = Color(0.0941176, 0, 0.329412, 0.513726)
+shadow_offset = Vector2(3, 3)
+
+[sub_resource type="Shader" id="Shader_vign"]
+code = "shader_type canvas_item;
+
+uniform float vignette_intensity = 0.4;
+uniform float vignette_opacity : hint_range(0.0, 1.0) = 0.5;
+uniform vec4 vignette_color : source_color = vec4(0.1, 0.0, 0.2, 1.0);
+
+void fragment() {
+    vec2 uv = UV;
+    
+    // Create the vignette effect
+    float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
+    float vignetteRadial = distance(uv, vec2(0.5, 0.5));
+    vignette = smoothstep(0.0, vignette_intensity, vignette);
+    vignetteRadial = smoothstep(vignette_intensity * 2.0, 0.1, vignetteRadial);
+    
+    // Combine both vignette styles
+    vignette = clamp(vignette + vignetteRadial, 0.0, 1.0);
+    
+    // Create some variation by time
+    vignette += sin(TIME * 0.5) * 0.05;
+    
+    // Mix with the vignette color
+    COLOR = mix(vignette_color, vec4(0.0), vignette);
+    COLOR.a = (1.0 - vignette) * vignette_opacity;
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vign"]
+shader = SubResource("Shader_vign")
+shader_parameter/vignette_intensity = 0.4
+shader_parameter/vignette_opacity = 0.3
+shader_parameter/vignette_color = Color(0.1, 0, 0.2, 1)
+
+[node name="IntroMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_y1fby")
+
+[node name="ParticlesLayer" type="CanvasLayer" parent="."]
+
+[node name="PinkParticles" type="CPUParticles2D" parent="ParticlesLayer"]
+position = Vector2(575, 324)
+amount = 50
+lifetime = 5.0
+preprocess = 2.0
+speed_scale = 0.5
+explosiveness = 0.1
+randomness = 0.2
+lifetime_randomness = 0.2
+emission_shape = 3
+emission_rect_extents = Vector2(600, 350)
+direction = Vector2(0, -1)
+spread = 60.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 50.0
+initial_velocity_max = 100.0
+scale_amount_min = 5.0
+scale_amount_max = 15.0
+color_ramp = SubResource("Gradient_m8l87")
+
+[node name="RedParticles" type="CPUParticles2D" parent="ParticlesLayer"]
+position = Vector2(600, 350)
+amount = 30
+lifetime = 4.0
+preprocess = 2.0
+speed_scale = 0.7
+explosiveness = 0.1
+randomness = 0.2
+lifetime_randomness = 0.2
+emission_shape = 3
+emission_rect_extents = Vector2(600, 350)
+direction = Vector2(0, -1)
+spread = 120.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 30.0
+initial_velocity_max = 80.0
+scale_amount_min = 5.0
+scale_amount_max = 12.0
+color_ramp = SubResource("Gradient_j1qg2")
+
+[node name="StarParticles" type="CPUParticles2D" parent="ParticlesLayer"]
+position = Vector2(600, 0)
+amount = 20
+lifetime = 8.0
+preprocess = 2.0
+explosiveness = 0.1
+randomness = 0.2
+lifetime_randomness = 0.5
+emission_shape = 3
+emission_rect_extents = Vector2(600, 1)
+direction = Vector2(0, 1)
+spread = 10.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 50.0
+initial_velocity_max = 100.0
+scale_amount_min = 2.0
+scale_amount_max = 5.0
+color_ramp = SubResource("Gradient_ekh82")
+
+[node name="MagicCircles" type="Node2D" parent="ParticlesLayer"]
+position = Vector2(600, 350)
+
+[node name="InnerCircle" type="CPUParticles2D" parent="ParticlesLayer/MagicCircles"]
+amount = 64
+lifetime = 3.0
+preprocess = 2.0
+speed_scale = 0.3
+local_coords = true
+emission_shape = 5
+emission_points = PackedVector2Array()
+emission_normals = PackedVector2Array()
+emission_colors = PackedColorArray()
+direction = Vector2(0, 0)
+spread = 180.0
+gravity = Vector2(0, 0)
+radial_accel_min = -50.0
+radial_accel_max = 50.0
+tangential_accel_min = 20.0
+tangential_accel_max = 50.0
+angle_min = -180.0
+angle_max = 180.0
+scale_amount_min = 2.0
+scale_amount_max = 5.0
+color_ramp = SubResource("Gradient_e4xo1")
+
+[node name="OuterCircle" type="CPUParticles2D" parent="ParticlesLayer/MagicCircles"]
+amount = 80
+lifetime = 4.0
+preprocess = 2.0
+speed_scale = 0.2
+local_coords = true
+emission_shape = 5
+emission_points = PackedVector2Array()
+emission_normals = PackedVector2Array()
+emission_colors = PackedColorArray()
+direction = Vector2(0, 0)
+spread = 180.0
+gravity = Vector2(0, 0)
+radial_accel_min = -20.0
+radial_accel_max = 20.0
+tangential_accel_min = -40.0
+tangential_accel_max = -20.0
+angle_min = -180.0
+angle_max = 180.0
+scale_amount_min = 3.0
+scale_amount_max = 6.0
+color_ramp = SubResource("Gradient_jwq75")
+
+[node name="FloorGlow" type="CPUParticles2D" parent="ParticlesLayer"]
+position = Vector2(600, 650)
+amount = 40
+lifetime = 3.0
+preprocess = 2.0
+speed_scale = 0.3
+explosiveness = 0.1
+randomness = 0.2
+lifetime_randomness = 0.2
+emission_shape = 3
+emission_rect_extents = Vector2(500, 50)
+direction = Vector2(0, -1)
+spread = 20.0
+gravity = Vector2(0, -40)
+initial_velocity_max = 30.0
+scale_amount_min = 10.0
+scale_amount_max = 40.0
+color = Color(0.427451, 0.141176, 0.678431, 0.223529)
+
+[node name="MenuContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = 30.0
+offset_right = 200.0
+offset_bottom = 290.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 25
+
+[node name="StartButton" type="Button" parent="MenuContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_hover_color = Color(0.996078, 0.847059, 1, 1)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(0.996078, 0.847059, 1, 1)
+theme_override_colors/font_pressed_color = Color(0.996078, 0.847059, 1, 1)
+theme_override_font_sizes/font_size = 30
+theme_override_styles/hover = SubResource("StyleBoxFlat_4o0mk")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_6kxoa")
+theme_override_styles/normal = SubResource("StyleBoxFlat_v1wqd")
+text = "START GAME"
+
+[node name="ButtonGlow" type="CPUParticles2D" parent="MenuContainer/StartButton"]
+position = Vector2(200, 30)
+amount = 20
+local_coords = true
+emission_shape = 3
+emission_rect_extents = Vector2(200, 30)
+spread = 180.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 10.0
+initial_velocity_max = 20.0
+scale_amount_min = 2.0
+scale_amount_max = 5.0
+color = Color(0.701961, 0.345098, 1, 0.294118)
+
+[node name="OptionsButton" type="Button" parent="MenuContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_hover_color = Color(0.996078, 0.847059, 1, 1)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(0.996078, 0.847059, 1, 1)
+theme_override_colors/font_pressed_color = Color(0.996078, 0.847059, 1, 1)
+theme_override_font_sizes/font_size = 30
+theme_override_styles/hover = SubResource("StyleBoxFlat_4o0mk")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_6kxoa")
+theme_override_styles/normal = SubResource("StyleBoxFlat_v1wqd")
+text = "OPTIONS"
+
+[node name="ButtonGlow" type="CPUParticles2D" parent="MenuContainer/OptionsButton"]
+position = Vector2(200, 30)
+amount = 20
+local_coords = true
+emission_shape = 3
+emission_rect_extents = Vector2(200, 30)
+spread = 180.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 10.0
+initial_velocity_max = 20.0
+scale_amount_min = 2.0
+scale_amount_max = 5.0
+color = Color(0.701961, 0.345098, 1, 0.294118)
+
+[node name="QuitButton" type="Button" parent="MenuContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_hover_color = Color(0.996078, 0.847059, 1, 1)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(0.996078, 0.847059, 1, 1)
+theme_override_colors/font_pressed_color = Color(0.996078, 0.847059, 1, 1)
+theme_override_font_sizes/font_size = 30
+theme_override_styles/hover = SubResource("StyleBoxFlat_4o0mk")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_6kxoa")
+theme_override_styles/normal = SubResource("StyleBoxFlat_v1wqd")
+text = "QUIT"
+
+[node name="ButtonGlow" type="CPUParticles2D" parent="MenuContainer/QuitButton"]
+position = Vector2(200, 30)
+amount = 20
+local_coords = true
+emission_shape = 3
+emission_rect_extents = Vector2(200, 30)
+spread = 180.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 10.0
+initial_velocity_max = 20.0
+scale_amount_min = 2.0
+scale_amount_max = 5.0
+color = Color(0.701961, 0.345098, 1, 0.294118)
+
+[node name="GameTitle" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -177.5
+offset_top = 100.0
+offset_right = 177.5
+offset_bottom = 217.0
+grow_horizontal = 2
+text = "BRUH"
+label_settings = SubResource("LabelSettings_82wc8")
+horizontal_alignment = 1
+
+[node name="TitleGlow" type="CPUParticles2D" parent="GameTitle"]
+position = Vector2(177.5, 60)
+amount = 30
+lifetime = 2.0
+preprocess = 1.0
+explosiveness = 0.1
+randomness = 0.2
+lifetime_randomness = 0.2
+emission_shape = 3
+emission_rect_extents = Vector2(150, 50)
+direction = Vector2(0, -1)
+spread = 90.0
+gravity = Vector2(0, -20)
+initial_velocity_min = 10.0
+initial_velocity_max = 30.0
+scale_amount_min = 5.0
+scale_amount_max = 12.0
+color = Color(0.894118, 0.286275, 0.741176, 0.317647)
+
+[node name="Tagline" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -320.0
+offset_top = -45.0
+offset_right = 320.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "SURVIVE THE CHAOS"
+label_settings = SubResource("LabelSettings_njrcp")
+horizontal_alignment = 1
+
+[node name="VersionInfo" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -43.0
+offset_right = 250.0
+offset_bottom = -20.0
+grow_vertical = 0
+text = "Version 0.1"
+horizontal_alignment = 1
+
+[node name="CharacterPreview" type="Node2D" parent="."]
+position = Vector2(600, 400)
+
+[node name="CharacterGlow" type="CPUParticles2D" parent="CharacterPreview"]
+position = Vector2(0, 25)
+amount = 30
+lifetime = 1.5
+preprocess = 2.0
+local_coords = true
+emission_shape = 1
+emission_sphere_radius = 30.0
+direction = Vector2(0, -1)
+spread = 180.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 5.0
+initial_velocity_max = 30.0
+scale_amount_min = 3.0
+scale_amount_max = 6.0
+color = Color(0.643137, 0.27451, 0.905882, 0.427451)
+
+[node name="CharacterBody" type="Polygon2D" parent="CharacterPreview"]
+position = Vector2(0, 25)
+color = Color(0.580392, 0.266667, 0.917647, 1)
+polygon = PackedVector2Array(-15, -40, 15, -40, 20, -25, 20, 10, 15, 20, -15, 20, -20, 10, -20, -25)
+
+[node name="CharacterGun" type="Polygon2D" parent="CharacterPreview"]
+color = Color(0.290196, 0.117647, 0.486275, 1)
+polygon = PackedVector2Array(-5, -10, 5, -10, 25, -5, 25, 5, 5, 10, -5, 10)
+
+[node name="BulletSpawn" type="Marker2D" parent="CharacterPreview/CharacterGun"]
+position = Vector2(25, 0)
+
+[node name="GunGlow" type="CPUParticles2D" parent="CharacterPreview/CharacterGun"]
+position = Vector2(25, 0)
+amount = 15
+lifetime = 0.8
+local_coords = true
+emission_shape = 1
+emission_sphere_radius = 5.0
+spread = 15.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 10.0
+initial_velocity_max = 30.0
+scale_amount_min = 2.0
+scale_amount_max = 4.0
+color = Color(0.980392, 0.513726, 1, 0.654902)
+
+[node name="FXContainer" type="Control" parent="."]
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="ScreenVignette" type="ColorRect" parent="."]
+z_index = -20
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+metadata/_edit_lock_ = true
+
+[node name="VignetteShader" type="ColorRect" parent="ScreenVignette"]
+material = SubResource("ShaderMaterial_vign")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[connection signal="pressed" from="MenuContainer/StartButton" to="." method="_on_start_button_pressed"]
+[connection signal="pressed" from="MenuContainer/OptionsButton" to="." method="_on_options_button_pressed"]
+[connection signal="pressed" from="MenuContainer/QuitButton" to="." method="_on_quit_button_pressed"]

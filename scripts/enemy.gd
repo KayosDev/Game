@@ -477,17 +477,11 @@ func deal_damage_to_player():
 		damage_timer = damage_cooldown
 
 func explode():
-	# Create explosion effect
-	for i in range(20):
-		var particle = blood_particle.instantiate()
-		get_tree().root.add_child(particle)
-		
-		var angle = randf_range(0, TAU)
-		var dist = randf_range(0, 30)
-		var pos = global_position + Vector2(cos(angle), sin(angle)) * dist
-		
-		particle.global_position = pos
-		particle.modulate = Color(1.0, 0.5, 0.0)
+	# Create simplified explosion effect
+	var particle = blood_particle.instantiate()
+	get_tree().root.call_deferred("add_child", particle)
+	particle.global_position = global_position
+	particle.modulate = Color(1.0, 0.5, 0.0)
 	
 	# Deal area damage to player if nearby
 	if is_instance_valid(player):
@@ -506,19 +500,19 @@ func spawn_mini_splitters():
 	
 	children_spawned = true
 	
-	# Spawn 3 smaller versions
-	for i in range(3):
+	# Spawn only 2 smaller versions instead of 3 to reduce lag
+	for i in range(2):
 		var mini = duplicate()
 		mini.scale = Vector2(0.6, 0.6)
 		mini.health = 40
 		mini.max_health = 40
 		mini.children_spawned = true  # Prevent infinite splitting
 		
-		var angle = randf_range(0, TAU)
+		var angle = TAU * i / 2
 		var dist = 30
 		var pos = global_position + Vector2(cos(angle), sin(angle)) * dist
 		
-		get_tree().root.add_child(mini)
+		get_tree().root.call_deferred("add_child", mini)
 		mini.setup(pos, player)
 
 func spawn_minions():
@@ -545,8 +539,6 @@ func get_hit(damage: int, bullet_trans: Transform2D):
 		if shield_health <= 0:
 			shield_active = false
 			modulate = Color(1, 1, 1)  # Normal color when shield breaks
-			# Add shield break effect
-			create_shield_break_effect()
 		else:
 			# Flash shield but don't take damage
 			modulate = Color(0.8, 0.8, 1.0, 0.8)
@@ -567,7 +559,7 @@ func get_hit(damage: int, bullet_trans: Transform2D):
 		is_health_bar_visible = true
 		health_bar_visible_timer = 3.0 # Show health bar for 3 seconds
 	
-	# Display damage text with animation
+	# Display damage text with animation - optimized
 	damage_text.text = str(damage)
 	if is_critical:
 		damage_text.text += "!"
@@ -578,97 +570,30 @@ func get_hit(damage: int, bullet_trans: Transform2D):
 	damage_text.visible = true
 	animation_tree['parameters/conditions/is_damaged'] = true
 	
-	# Add outline for better visibility
-	damage_text.add_theme_constant_override("outline_size", 2)
-	damage_text.add_theme_color_override("font_outline_color", Color(0.1, 0.1, 0.1))
+	# Simple animation instead of tween for better performance
+	damage_text.get_parent().position = Vector2(0, -40)
 	
-	# Animate the damage text
-	var start_pos = Vector2(0, -40)
-	damage_text.get_parent().position = start_pos
-	
-	var tween = create_tween()
-	tween.tween_property(damage_text.get_parent(), "position", start_pos + Vector2(0, -50), 0.8)
-	tween.parallel().tween_property(damage_text, "modulate", Color(1, 1, 1, 0), 0.8)
-	
-	# Make critical hits more dramatic
-	if is_critical:
-		tween.parallel().tween_property(damage_text.get_parent(), "scale", Vector2(1.5, 1.5), 0.2)
-		tween.tween_property(damage_text.get_parent(), "scale", Vector2(1.0, 1.0), 0.6)
-	
-	tween.tween_callback(func(): damage_text.visible = false)
-	tween.tween_property(damage_text, "modulate", Color(1, 1, 1, 1), 0.05) # Reset modulate for next use
-	
-	# Make text size based on damage amount for more impact
-	var size_factor = clampf(float(damage) / 50.0, 0.8, 2.0)
-	damage_text.get_parent().scale = Vector2(size_factor, size_factor)
+	# Optimize push effect
+	set_push(Vector2.RIGHT.rotated(bullet_trans.get_rotation()), recoil_strength, 0.2)
 	
 	# Check if dead
 	if health <= 0:
 		animation_tree['parameters/conditions/is_destroyed'] = true
-		create_death_explosion()
 		
 		# Do splitter special case
 		if enemy_type == "Splitter" and !children_spawned:
-			spawn_mini_splitters()
-	
-	# Bleeding effect
-	var bleeding_effect = blood_particle.instantiate()
-	get_tree().root.add_child(bleeding_effect)
-	bleeding_effect.setup(bullet_trans)
-	
-	# Stronger recoil when hit
-	set_push(Vector2.RIGHT.rotated(bullet_trans.get_rotation()), recoil_strength, 0.2)
-	
-	# Add additional impact particles for more feedback
-	add_hit_particles(bullet_trans)
-	
-	# Small screen shake on hit
-	if get_parent() and get_parent().has_method("apply_screen_shake"):
-		var shake_amount = 2.0
-		if is_critical:
-			shake_amount = 5.0
-		if health <= 0:
-			shake_amount = 10.0
-			
-		get_parent().apply_screen_shake(shake_amount, 0.2)
+			call_deferred("spawn_mini_splitters")
+		
+		# Small screen shake on death only
+		if get_parent() and get_parent().has_method("apply_screen_shake"):
+			get_parent().apply_screen_shake(8.0, 0.2)
 
 func create_death_explosion():
-	# Attempt to load the physics-based death particles
-	var particles_scene = load("res://scenes/physics_death_particles.tscn")
-	
-	# If scene couldn't be loaded, create simple particles instead
-	if particles_scene == null:
-		# Create simple fallback particles
-		create_simple_death_particles()
-		return
-		
-	# Create the new physics-based death particles
-	var physics_particles = particles_scene.instantiate()
-	physics_particles.position = global_position
-	
-	# Set the particle color based on enemy type
-	physics_particles.set_particle_color(enemy_type)
-	
-	# Add to the scene
-	get_tree().root.add_child(physics_particles)
-	
-	# Brief slow-motion effect on death
-	Engine.time_scale = 0.6
-	var slow_timer = Timer.new()
-	slow_timer.wait_time = 0.1
-	slow_timer.one_shot = true
-	slow_timer.autostart = true
-	get_tree().root.add_child(slow_timer)
-	var reset_timescale_func = func(): Engine.time_scale = 1.0
-	slow_timer.timeout.connect(reset_timescale_func)
-
-# Fallback function for when the death particles scene isn't available
-func create_simple_death_particles():
-	# Create simple CPU particles as fallback
+	# Create simplified death effect to reduce lag
 	var particles = CPUParticles2D.new()
 	particles.position = global_position
-	particles.amount = 30
-	particles.lifetime = 0.8
+	particles.amount = 10 # Reduced from 30
+	particles.lifetime = 0.6
 	particles.explosiveness = 1.0
 	particles.direction = Vector2(0, 0)
 	particles.spread = 180
@@ -680,131 +605,39 @@ func create_simple_death_particles():
 	
 	# Set color based on enemy type
 	match enemy_type:
-		"basic":
-			particles.color = Color(0.8, 0.2, 0.2)  # Red
-		"fast":
+		"Fast":
 			particles.color = Color(0.2, 0.7, 0.2)  # Green
-		"tank":
+		"Tank":
 			particles.color = Color(0.2, 0.2, 0.8)  # Blue
-		"splitter":
+		"Splitter":
 			particles.color = Color(0.8, 0.6, 0.2)  # Orange
-		"bomber":
-			particles.color = Color(0.7, 0.2, 0.7)  # Purple
-		"shooter":
-			particles.color = Color(0.2, 0.7, 0.7)  # Cyan
 		_:
 			particles.color = Color(0.8, 0.2, 0.2)  # Default red
 	
 	particles.emitting = true
 	particles.one_shot = true
-	get_tree().root.add_child(particles)
+	get_tree().root.call_deferred("add_child", particles)
 	
 	# Auto-clean up
 	var timer = Timer.new()
-	timer.wait_time = 1.0
+	timer.wait_time = 0.7
 	timer.one_shot = true
 	timer.autostart = true
 	particles.add_child(timer)
-	var free_particles_func = func(): particles.queue_free()
-	timer.timeout.connect(free_particles_func)
+	timer.timeout.connect(func(): particles.queue_free())
 	
-	# Brief slow-motion effect on death
-	Engine.time_scale = 0.6
-	var slow_timer = Timer.new()
-	slow_timer.wait_time = 0.1
-	slow_timer.one_shot = true
-	slow_timer.autostart = true
-	get_tree().root.add_child(slow_timer)
-	var reset_timescale_func = func(): Engine.time_scale = 1.0
-	slow_timer.timeout.connect(reset_timescale_func)
+	# Remove slow-motion effect to prevent stutter
+	# Engine.time_scale = 1.0 // We're not using slow-motion anymore
 
+# Completely disable visual effects that aren't essential
 func create_shield_break_effect():
-	# Shield break effects disabled
-	return
+	pass
 	
-	# Original code below (now disabled)
-	# Create shield-break particles
-	var particles = CPUParticles2D.new()
-	particles.position = global_position
-	particles.amount = 30
-	particles.lifetime = 0.6
-	particles.explosiveness = 0.9
-	particles.direction = Vector2(0, -1)
-	particles.spread = 180
-	particles.gravity = Vector2(0, 0)
-	particles.initial_velocity_min = 60
-	particles.initial_velocity_max = 120
-	particles.scale_amount_min = 3
-	particles.scale_amount_max = 3
-	particles.color = Color(0.5, 0.5, 1.0)
-	
-	particles.emitting = true
-	particles.one_shot = true
-	get_tree().root.add_child(particles)
-	
-	# Auto-clean up
-	var timer = Timer.new()
-	timer.wait_time = 1.0
-	timer.one_shot = true
-	timer.autostart = true
-	particles.add_child(timer)
-	var free_particles_func = func(): particles.queue_free()
-	timer.timeout.connect(free_particles_func)
-
 func add_hit_particles(bullet_trans):
-	# Hit particles disabled
-	return
+	pass
 	
-	# Original code below (now disabled)
-	# Create impact particles
-	var particles = CPUParticles2D.new()
-	particles.position = global_position + Vector2.RIGHT.rotated(bullet_trans.get_rotation()) * 10
-	particles.amount = 15
-	particles.lifetime = 0.4
-	particles.explosiveness = 0.8
-	particles.direction = Vector2(bullet_trans.get_rotation(), 0)
-	particles.spread = 30
-	particles.initial_velocity_min = 50
-	particles.initial_velocity_max = 100
-	particles.scale_amount_min = 3
-	particles.scale_amount_max = 3
-	particles.color = Color(0.8, 0.2, 0.2)
-	
-	particles.emitting = true
-	particles.one_shot = true
-	get_tree().root.add_child(particles)
-	
-	# Auto-clean up
-	var timer = Timer.new()
-	timer.wait_time = 0.5
-	timer.one_shot = true
-	timer.autostart = true
-	particles.add_child(timer)
-	var free_particles_func = func(): particles.queue_free()
-	timer.timeout.connect(free_particles_func)
-	
-	# Flash more intensely in the shader
-	if $Polygon2D.material:
-		$Polygon2D.material.set_shader_parameter("flash_modifier", 1.5)
-
 func create_blood_stain():
-	# Blood stains disabled
-	return
-	
-	# Original code below (now disabled)
-	if blood_stain:
-		var stain = blood_stain.instantiate()
-		# Place the stain at the enemy's current position
-		stain.global_position = global_position
-		
-		# Randomize the rotation and scale for variety
-		stain.rotation = randf_range(0, 2 * PI)
-		var scale_factor = randf_range(0.8, 1.2)
-		stain.scale = Vector2(scale_factor, scale_factor)
-		
-		# Add to the scene but in a lower z-index so it appears below everything
-		var scene_root = get_tree().root
-		scene_root.call_deferred("add_child", stain)
+	pass
 
 func destroy():
 	enemy_destroyed.emit(self)

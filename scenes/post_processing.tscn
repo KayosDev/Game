@@ -1,0 +1,221 @@
+[gd_scene load_steps=11 format=3 uid="uid://dxpfxnf3v5mae"]
+
+[ext_resource type="Script" path="res://scripts/post_processing.gd" id="1_ahjk2"]
+
+[sub_resource type="Shader" id="Shader_bloom"]
+code = "shader_type canvas_item;
+
+uniform float bloom_intensity = 0.4;
+uniform float bloom_threshold = 0.6;
+uniform float bloom_size = 0.7;
+uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+
+void fragment() {
+    // Get the original screen color
+    vec4 screen_color = texture(screen_texture, SCREEN_UV);
+    
+    // Calculate brightness threshold for bloom
+    float brightness = max(screen_color.r, max(screen_color.g, screen_color.b));
+    float contribution = max(0.0, brightness - bloom_threshold);
+    contribution = pow(contribution, 2.0) * bloom_intensity;
+    
+    // Calculate blur for the bloom effect using multiple mipmap levels
+    vec4 bloom_color = vec4(0.0);
+    float total_weight = 0.0;
+    
+    // Sample multiple mipmap levels for bloom effect
+    for(float i = 0.0; i < 5.0; i++) {
+        float mip_level = i * bloom_size;
+        float weight = 1.0 / (pow(2.0, i) + 1.0);
+        bloom_color += textureLod(screen_texture, SCREEN_UV, mip_level) * weight;
+        total_weight += weight;
+    }
+    bloom_color /= total_weight;
+    
+    // Apply threshold and combine
+    vec4 final_bloom = bloom_color * contribution;
+    
+    // Add bloom to original color
+    COLOR = screen_color + final_bloom;
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bloom"]
+shader = SubResource("Shader_bloom")
+shader_parameter/bloom_intensity = 0.4
+shader_parameter/bloom_threshold = 0.6
+shader_parameter/bloom_size = 0.7
+
+[sub_resource type="Shader" id="Shader_lighting"]
+code = "shader_type canvas_item;
+
+// Array of light sources
+uniform vec2 light_positions[10];
+uniform vec4 light_colors[10];
+uniform float light_intensities[10];
+uniform int num_lights;
+uniform float time;
+
+void fragment() {
+    // Start with a transparent color
+    vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
+    
+    // Process each light source
+    for(int i = 0; i < num_lights; i++) {
+        // Calculate distance to light
+        vec2 light_pos = light_positions[i];
+        float dist = distance(SCREEN_UV * vec2(1280.0, 720.0), light_pos);
+        
+        // Apply distance falloff
+        float intensity = light_intensities[i] * 1000.0 / (dist * dist + 100.0);
+        
+        // Add light contribution
+        vec4 light_color = light_colors[i];
+        
+        // Add subtle pulsing to the light
+        float pulse = sin(time * 1.5 + float(i) * 0.7) * 0.2 + 0.8;
+        
+        // Apply with glow effect
+        color += light_color * intensity * pulse;
+    }
+    
+    // Limit the maximum brightness
+    color = min(color, vec4(1.0, 1.0, 1.0, 0.8));
+    
+    // Set the output color
+    COLOR = color;
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_lighting"]
+shader = SubResource("Shader_lighting")
+shader_parameter/num_lights = 0
+shader_parameter/time = 0.0
+
+[sub_resource type="Shader" id="Shader_chromatic"]
+code = "shader_type canvas_item;
+
+uniform float aberration_amount = 0.5;
+uniform vec2 aberration_offset = vec2(0.001, 0.001);
+uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+
+void fragment() {
+    // Get RGB channels from slightly offset UVs
+    float r = texture(screen_texture, SCREEN_UV - aberration_offset * aberration_amount).r;
+    float g = texture(screen_texture, SCREEN_UV).g;
+    float b = texture(screen_texture, SCREEN_UV + aberration_offset * aberration_amount).b;
+    
+    // Recombine channels
+    COLOR = vec4(r, g, b, 1.0);
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_chromatic"]
+shader = SubResource("Shader_chromatic")
+shader_parameter/aberration_amount = 0.5
+shader_parameter/aberration_offset = Vector2(0.001, 0.001)
+
+[sub_resource type="Shader" id="Shader_vignette"]
+code = "shader_type canvas_item;
+
+uniform float vignette_intensity = 0.4;
+uniform vec4 vignette_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+
+void fragment() {
+    // Get original screen color
+    vec4 screen_color = texture(screen_texture, SCREEN_UV);
+    
+    // Calculate vignette effect
+    vec2 uv = SCREEN_UV - 0.5;
+    float vignette = 1.0 - dot(uv, uv) * vignette_intensity;
+    vignette = smoothstep(0.0, 1.0, vignette);
+    
+    // Apply vignette
+    vec4 final_color = mix(vignette_color, screen_color, vignette);
+    
+    COLOR = final_color;
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
+shader = SubResource("Shader_vignette")
+shader_parameter/vignette_intensity = 0.4
+shader_parameter/vignette_color = Color(0.05, 0, 0.1, 1)
+
+[sub_resource type="Shader" id="Shader_grain"]
+code = "shader_type canvas_item;
+
+uniform float grain_amount = 0.03;
+uniform float grain_speed = 25.0;
+uniform float grain_time = 0.0;
+uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+
+float random(vec2 uv) {
+    return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
+void fragment() {
+    // Get original screen color
+    vec4 screen_color = texture(screen_texture, SCREEN_UV);
+    
+    // Create noise
+    vec2 noise_uv = SCREEN_UV * vec2(textureSize(screen_texture, 0));
+    noise_uv += grain_time * grain_speed;
+    float noise = random(noise_uv) * 2.0 - 1.0;
+    
+    // Apply noise based on grain amount
+    vec3 grain_color = screen_color.rgb + vec3(noise * grain_amount);
+    
+    COLOR = vec4(grain_color, screen_color.a);
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grain"]
+shader = SubResource("Shader_grain")
+shader_parameter/grain_amount = 0.03
+shader_parameter/grain_speed = 25.0
+shader_parameter/grain_time = 0.0
+
+[node name="PostProcessing" type="CanvasLayer"]
+script = ExtResource("1_ahjk2")
+
+[node name="Bloom" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_bloom")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="DynamicLighting" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_lighting")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ChromaticAberration" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_chromatic")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Vignette" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_vignette")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="FilmGrain" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_grain")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2 
