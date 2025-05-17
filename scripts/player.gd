@@ -53,22 +53,22 @@ var weapon_levels = {} # Dictionary to track weapon upgrade levels
 @onready var body_rotate: Polygon2D = $BodyRotate
 @onready var body_lr_player: AnimationPlayer = $BodyLRPlayer
 @onready var body_rotete_player: AnimationPlayer = $BodyRotatePlayer
-@onready var move_trail_effect: GPUParticles2D = $MovementTrailEffect
+@onready var move_trail_effect: Node2D = $MovementTrailEffect
 @onready var bullet_scene = preload("res://scenes/bullet.tscn")
 @onready var bullet_spawn_pos: Node2D = $BodyRotate/BulletSpawnPoint
 @onready var shot_timer: Timer = $ShotTimer
-@onready var shot_effect: GPUParticles2D = $BodyRotate/ShootingEffect
+@onready var shot_effect: Node2D = $BodyRotate/ShootingEffect
 @onready var body_lr_collider: CollisionPolygon2D = $CollisionBodyLR
 @onready var audio_player: AudioStreamPlayer = $AudioStreamPlayer
 @onready var health_bar: ProgressBar = $HealthBar
-@onready var damage_effect: GPUParticles2D = $DamageEffect
-@onready var death_effect: GPUParticles2D = $DeathEffect
-@onready var heal_effect: GPUParticles2D = $HealEffect
+@onready var damage_effect: Node2D = $DamageEffect
+@onready var death_effect: Node2D = $DeathEffect
+@onready var heal_effect: Node2D = $HealEffect
 # We'll create these dynamically instead of using @onready
 var melee_timer_node: Timer
 var melee_swing: Polygon2D
 var melee_hitbox: Area2D
-var melee_impact_effect: GPUParticles2D
+var melee_impact_effect: Node2D
 
 # Dictionary of available weapon types
 var weapon_types = {
@@ -133,6 +133,12 @@ func _ready():
 	health = max_health
 	health_bar.max_value = max_health
 	health_bar.value = health
+	
+	# Check if bullet scene loaded correctly
+	if bullet_scene == null:
+		printerr("Failed to load bullet scene! Check if 'res://scenes/bullet.tscn' exists.")
+		# Fallback to a simple polygon for bullets
+		bullet_scene = _create_fallback_bullet()
 	
 	# Improve health bar appearance
 	health_bar.modulate = Color(1.0, 1.0, 1.0, 0.9)
@@ -263,36 +269,33 @@ func setup_melee_components():
 	if has_node("MeleeImpactEffect"):
 		melee_impact_effect = get_node("MeleeImpactEffect")
 	else:
-		melee_impact_effect = GPUParticles2D.new()
+		melee_impact_effect = CPUParticles2D.new()
 		melee_impact_effect.name = "MeleeImpactEffect"
 		
-		# Create particle material
-		var material = ParticleProcessMaterial.new()
-		material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-		material.emission_sphere_radius = 5.0
-		material.direction = Vector3(1, 0, 0)
-		material.spread = 60.0
-		material.initial_velocity_min = 80.0
-		material.initial_velocity_max = 120.0
-		material.gravity = Vector3(0, 0, 0)
-		material.damping_min = 20.0
-		material.damping_max = 40.0
-		material.set_param_min(ParticleProcessMaterial.PARAM_SCALE, 1.0)
-		material.set_param_max(ParticleProcessMaterial.PARAM_SCALE, 2.0)
-		material.color = Color(1.0, 0.7, 0.3)
+		# Set up CPU particle properties directly
+		melee_impact_effect.emitting = false
+		melee_impact_effect.amount = 16
+		melee_impact_effect.lifetime = 0.4
+		melee_impact_effect.explosiveness = 0.8
+		melee_impact_effect.one_shot = true
+		melee_impact_effect.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+		melee_impact_effect.emission_sphere_radius = 5.0
+		melee_impact_effect.direction = Vector2(1, 0)
+		melee_impact_effect.spread = 60.0
+		melee_impact_effect.initial_velocity_min = 80.0
+		melee_impact_effect.initial_velocity_max = 120.0
+		melee_impact_effect.gravity = Vector2(0, 0)
+		melee_impact_effect.damping_min = 20.0
+		melee_impact_effect.damping_max = 40.0
+		melee_impact_effect.scale_amount_min = 1.0
+		melee_impact_effect.scale_amount_max = 2.0
+		melee_impact_effect.color = Color(1.0, 0.7, 0.3)
 		
 		# Setup color ramp if needed
 		var color_ramp = Gradient.new()
 		color_ramp.add_point(0.0, Color(1.0, 0.7, 0.3, 1.0))
 		color_ramp.add_point(1.0, Color(1.0, 0.2, 0.1, 0.0))
-		material.color_ramp = color_ramp
-		
-		melee_impact_effect.process_material = material
-		melee_impact_effect.amount = 16
-		melee_impact_effect.lifetime = 0.4
-		melee_impact_effect.explosiveness = 0.8
-		melee_impact_effect.one_shot = true
-		melee_impact_effect.emitting = false
+		melee_impact_effect.color_ramp = color_ramp
 		
 		add_child(melee_impact_effect)
 	
@@ -448,7 +451,15 @@ func shoot():
 	var bullet_count = 3
 	
 	for i in range(bullet_count):
-		var bullet = bullet_scene.instantiate()
+		var bullet
+		
+		# Check if we're using a PackedScene or a GDScript for bullets
+		if bullet_scene is PackedScene:
+			bullet = bullet_scene.instantiate()
+		else:
+			# Create from script instead
+			bullet = Area2D.new()
+			bullet.set_script(bullet_scene)
 		
 		# Calculate a random angle based on recoil control
 		var spread = 20.0
@@ -473,9 +484,10 @@ func shoot():
 		get_tree().root.add_child(bullet)
 	
 	# Enhanced shot effect
-	shot_effect.emitting = true
-	shot_effect.amount = 20  # More particles
-	shot_effect.lifetime = 0.4  # Visible longer
+	if shot_effect:
+		shot_effect.emitting = true
+		shot_effect.amount = 20  # More particles
+		shot_effect.lifetime = 0.4  # Visible longer
 	
 	# Add screen shake for impact!
 	var screen_shake = randf_range(3.0, 6.0)
@@ -483,8 +495,9 @@ func shoot():
 		get_parent().apply_screen_shake(screen_shake, 0.2)
 	
 	# Play shoot sound with random pitch for variety
-	audio_player.play()
-	audio_player.pitch_scale = randf_range(0.9, 1.1)
+	if audio_player:
+		audio_player.play()
+		audio_player.pitch_scale = randf_range(0.9, 1.1)
 
 func set_push(dir: Vector2, strength: float, timer: float):
 	push_dir = dir
@@ -580,9 +593,61 @@ func die():
 	add_child(timer)
 	timer.start()
 	
-	# Add to scene
-	get_tree().root.add_child(death_message_instance)
-	print("Death menu added to scene tree")
+	# Create death message if it doesn't exist
+	if death_message_instance == null:
+		death_message_instance = create_death_message()
+	
+	# Add to scene if valid
+	if death_message_instance:
+		get_tree().root.add_child(death_message_instance)
+		print("Death menu added to scene tree")
+
+func create_death_message():
+	# Create a death message canvas layer
+	var canvas_layer = CanvasLayer.new()
+	canvas_layer.layer = 10
+	canvas_layer.name = "DeathMessageLayer"
+	
+	# Create background
+	var background = ColorRect.new()
+	background.color = Color(0, 0, 0, 0.5)
+	background.anchors_preset = Control.PRESET_FULL_RECT
+	canvas_layer.add_child(background)
+	
+	# Create container
+	var container = VBoxContainer.new()
+	container.anchors_preset = Control.PRESET_CENTER
+	container.size = Vector2(500, 300)
+	container.position = Vector2(-250, -150)
+	canvas_layer.add_child(container)
+	
+	# Death message
+	var message = Label.new()
+	message.text = "YOU DIED"
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message.add_theme_font_size_override("font_size", 72)
+	message.add_theme_color_override("font_color", Color(0.9, 0.2, 0.2))
+	container.add_child(message)
+	
+	# Spacing
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 50)
+	container.add_child(spacer)
+	
+	# Restart instruction
+	var restart_label = Label.new()
+	restart_label.text = "Press SPACE or R to restart"
+	restart_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	restart_label.add_theme_font_size_override("font_size", 32)
+	container.add_child(restart_label)
+	
+	# Animate the death menu
+	animate_death_menu(container, background)
+	
+	# Add blood effects
+	add_blood_effects(canvas_layer)
+	
+	return canvas_layer
 
 func animate_death_menu(container, background):
 	# Start with everything transparent
@@ -988,7 +1053,12 @@ func spawn_orbital_projectile(config, level):
 	return
 	
 	# Create a new projectile for the orbit
-	var bullet = bullet_scene.instantiate()
+	var bullet
+	if bullet_scene is PackedScene:
+		bullet = bullet_scene.instantiate()
+	else:
+		bullet = Area2D.new()
+		bullet.set_script(bullet_scene)
 	
 	# Use the player's position as the base position
 	bullet.global_position = global_position
@@ -1174,7 +1244,13 @@ func fire_weapon(weapon_type):
 	match weapon_type:
 		"laser":
 			# Create a laser beam projectile with increased scale for impact
-			var bullet = bullet_scene.instantiate()
+			var bullet
+			if bullet_scene is PackedScene:
+				bullet = bullet_scene.instantiate()
+			else:
+				bullet = Area2D.new()
+				bullet.set_script(bullet_scene)
+				
 			bullet.setup(bullet_spawn_pos.global_transform)
 			bullet.modulate = config.color
 			if config.has("projectile_scale"):
@@ -1196,7 +1272,13 @@ func fire_weapon(weapon_type):
 			# Create multiple shotgun pellets with more pellets per level
 			var pellet_count = config.projectile_count + (level - 1) * 2
 			for i in range(pellet_count):
-				var bullet = bullet_scene.instantiate()
+				var bullet
+				if bullet_scene is PackedScene:
+					bullet = bullet_scene.instantiate()
+				else:
+					bullet = Area2D.new()
+					bullet.set_script(bullet_scene)
+					
 				var spread_angle = randf_range(-config.spread, config.spread)
 				
 				# Create a rotated transform for the bullet
@@ -1212,7 +1294,13 @@ func fire_weapon(weapon_type):
 				
 		"missile":
 			# Create a homing missile with explosions
-			var bullet = bullet_scene.instantiate()
+			var bullet
+			if bullet_scene is PackedScene:
+				bullet = bullet_scene.instantiate()
+			else:
+				bullet = Area2D.new()
+				bullet.set_script(bullet_scene)
+				
 			bullet.setup(bullet_spawn_pos.global_transform)
 			bullet.modulate = config.color
 			if config.has("projectile_scale"):
@@ -1229,7 +1317,13 @@ func fire_weapon(weapon_type):
 			
 		"lightning":
 			# Create a chain lightning projectile with more chains per level
-			var bullet = bullet_scene.instantiate()
+			var bullet
+			if bullet_scene is PackedScene:
+				bullet = bullet_scene.instantiate()
+			else:
+				bullet = Area2D.new()
+				bullet.set_script(bullet_scene)
+				
 			bullet.setup(bullet_spawn_pos.global_transform)
 			bullet.modulate = config.color
 			bullet.damage = int(config.damage * damage_multiplier)
@@ -1399,3 +1493,61 @@ func register_console_commands():
 	LimboConsole.register_command(console_set_position, "set_position", "Set player position")
 	LimboConsole.register_command(console_kill_all_enemies, "kill_all", "Kill all enemies in the scene")
 	LimboConsole.register_command(console_set_speed, "set_speed", "Set player movement speed")
+
+# Create a fallback bullet class
+func _create_fallback_bullet():
+	# Create a custom script class for bullets
+	var script = GDScript.new()
+	script.source_code = """
+extends Area2D
+
+var velocity = Vector2(1, 0)
+var speed = 500
+var damage = 10
+
+func _init():
+	# Add collision
+	var collision = CollisionShape2D.new()
+	var shape = CircleShape2D.new()
+	shape.radius = 5
+	collision.shape = shape
+	add_child(collision)
+	
+	# Add visual
+	var polygon = Polygon2D.new()
+	polygon.polygon = PackedVector2Array([Vector2(-5, -2), Vector2(5, -2), Vector2(5, 2), Vector2(-5, 2)])
+	polygon.color = Color(1, 0.7, 0.2)
+	add_child(polygon)
+
+func _ready():
+	add_to_group("projectiles")
+
+func setup(transform):
+	global_transform = transform
+	velocity = transform.x.normalized()
+	rotation = velocity.angle()
+
+func _physics_process(delta):
+	position += velocity * speed * delta
+	
+	# Auto destroy bullets that go too far off screen
+	if position.length() > 2000:
+		queue_free()
+
+func set_tracking(value):
+	pass
+
+func set_chain_properties(chains, range_val):
+	pass
+
+func set_pierce(value):
+	pass
+
+func set_orbital_mode(value):
+	speed = 0
+"""
+	
+	script.reload()
+	
+	# Return the script as our bullet "scene"
+	return script

@@ -8,3 +8,7 @@ res://scripts/bullet.gd
 res://scripts/enemy.gd
 res://scripts/game.gd
 res://scripts/player.gd
+res://scenes/blood_particle.tscn
+res://scenes/bullet_particle.tscn
+res://scripts/blood_particle.gd
+res://scripts/bullet_particle.gd

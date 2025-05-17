@@ -1,26 +1,7 @@
-[gd_scene load_steps=23 format=3 uid="uid://cqpatfifsn3sg"]
+[gd_scene load_steps=12 format=3 uid="uid://cqpatfifsn3sg"]
 
 [ext_resource type="Script" uid="uid://d1lse7ovlcp25" path="res://scripts/player.gd" id="1_sy1wy"]
 [ext_resource type="AudioStream" uid="uid://b5y5j2t81dq1l" path="res://assets/sound_effects/laserShoot.wav" id="2_qiobg"]
-
-[sub_resource type="Curve" id="Curve_5phf1"]
-_data = [Vector2(0, 0.384615), 0.0, 0.0, 0, 0, Vector2(0.320988, 0.978022), 0.0, 0.0, 0, 0, Vector2(0.460905, 0.626374), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
-point_count = 4
-
-[sub_resource type="CurveTexture" id="CurveTexture_saytj"]
-curve = SubResource("Curve_5phf1")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_0nije"]
-particle_flag_disable_z = true
-emission_shape = 3
-emission_box_extents = Vector3(5, 1, 1)
-spread = 42.0
-initial_velocity_min = 5.0
-initial_velocity_max = 10.0
-gravity = Vector3(0, 0, 0)
-scale_min = 6.0
-scale_max = 12.0
-scale_curve = SubResource("CurveTexture_saytj")
 
 [sub_resource type="Animation" id="Animation_p6stl"]
 resource_name = "IdleL"
@@ -92,24 +73,6 @@ _data = {
 &"MoveR": SubResource("Animation_rn48w")
 }
 
-[sub_resource type="Curve" id="Curve_ul8r3"]
-_data = [Vector2(0, 0.846154), 0.0, 1.4, 0, 0, Vector2(0.604938, 0.571428), -2.52979, -2.52979, 0, 0, Vector2(1, 0.153846), 0.0, 0.0, 0, 0]
-point_count = 3
-
-[sub_resource type="CurveTexture" id="CurveTexture_kcgkg"]
-curve = SubResource("Curve_ul8r3")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_63td5"]
-particle_flag_disable_z = true
-initial_velocity_min = 120.0
-initial_velocity_max = 169.0
-gravity = Vector3(20, 0, 0)
-tangential_accel_min = -20.0
-tangential_accel_max = 20.0
-scale_min = 4.0
-scale_max = 8.0
-scale_curve = SubResource("CurveTexture_kcgkg")
-
 [sub_resource type="Animation" id="Animation_ung4r"]
 resource_name = "Shot"
 length = 0.2
@@ -145,53 +108,6 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
-[sub_resource type="Curve" id="Curve_d8t6l"]
-_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), -2.0, 0.0, 0, 0]
-point_count = 2
-
-[sub_resource type="CurveTexture" id="CurveTexture_brvnd"]
-curve = SubResource("Curve_d8t6l")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_6pgto"]
-particle_flag_disable_z = true
-direction = Vector3(0, -1, 0)
-spread = 90.0
-initial_velocity_min = 40.0
-initial_velocity_max = 80.0
-gravity = Vector3(0, 0, 0)
-scale_min = 3.0
-scale_max = 8.0
-scale_curve = SubResource("CurveTexture_brvnd")
-color = Color(0.909804, 0.262745, 0.266667, 1)
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_drsql"]
-particle_flag_disable_z = true
-emission_shape = 1
-emission_sphere_radius = 20.0
-direction = Vector3(0, 0, 0)
-spread = 180.0
-initial_velocity_min = 50.0
-initial_velocity_max = 150.0
-gravity = Vector3(0, 0, 0)
-scale_min = 4.0
-scale_max = 12.0
-scale_curve = SubResource("CurveTexture_brvnd")
-color = Color(0.909804, 0.262745, 0.266667, 1)
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_u8jg3"]
-particle_flag_disable_z = true
-emission_shape = 1
-emission_sphere_radius = 30.0
-direction = Vector3(0, -1, 0)
-spread = 180.0
-initial_velocity_min = 20.0
-initial_velocity_max = 50.0
-gravity = Vector3(0, -20, 0)
-scale_min = 3.0
-scale_max = 8.0
-scale_curve = SubResource("CurveTexture_brvnd")
-color = Color(0.227451, 0.85098, 0.415686, 1)
-
 [node name="Player" type="CharacterBody2D" groups=["player"]]
 collision_mask = 3
 motion_mode = 1
@@ -200,13 +116,20 @@ script = ExtResource("1_sy1wy")
 [node name="CollisionBodyLR" type="CollisionPolygon2D" parent="."]
 polygon = PackedVector2Array(16, -32, -8, -32, -24, 32, 16, 32)
 
-[node name="MovementTrailEffect" type="GPUParticles2D" parent="."]
+[node name="MovementTrailEffect" type="CPUParticles2D" parent="."]
 position = Vector2(0, 31)
 emitting = false
-amount = 10
-lifetime = 0.1
+amount = 60
 one_shot = true
-process_material = SubResource("ParticleProcessMaterial_0nije")
+explosiveness = 0.8
+direction = Vector2(0, -1)
+spread = 30.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 100.0
+initial_velocity_max = 200.0
+scale_amount_min = 3.0
+scale_amount_max = 8.0
+color = Color(0.0392, 0.576, 0.588, 0.8)
 
 [node name="BodyLR" type="Polygon2D" parent="."]
 scale = Vector2(-1, 1)
@@ -235,14 +158,23 @@ polygon = PackedVector2Array(32, 0, -24, -16, -24, 16)
 [node name="BulletSpawnPoint" type="Node2D" parent="BodyRotate"]
 position = Vector2(41, 0)
 
-[node name="ShootingEffect" type="GPUParticles2D" parent="BodyRotate"]
+[node name="ShootingEffect" type="CPUParticles2D" parent="BodyRotate"]
 modulate = Color(0, 0.372549, 0.45098, 1)
 position = Vector2(32, 0)
 emitting = false
-amount = 10
-lifetime = 0.1
+amount = 50
+lifetime = 0.6
 one_shot = true
-process_material = SubResource("ParticleProcessMaterial_63td5")
+explosiveness = 1.0
+spread = 40.0
+gravity = Vector2(20, 0)
+initial_velocity_min = 150.0
+initial_velocity_max = 250.0
+tangential_accel_min = -20.0
+tangential_accel_max = 20.0
+scale_amount_min = 6.0
+scale_amount_max = 12.0
+color = Color(0, 0.372549, 0.45098, 1)
 
 [node name="BodyRotatePlayer" type="AnimationPlayer" parent="."]
 root_node = NodePath("../BodyRotate")
@@ -268,28 +200,55 @@ theme_override_styles/fill = SubResource("StyleBoxFlat_xrv60")
 value = 100.0
 show_percentage = false
 
-[node name="DamageEffect" type="GPUParticles2D" parent="."]
+[node name="DamageEffect" type="CPUParticles2D" parent="."]
 emitting = false
-amount = 15
-lifetime = 0.5
-one_shot = true
-explosiveness = 0.8
-process_material = SubResource("ParticleProcessMaterial_6pgto")
-
-[node name="DeathEffect" type="GPUParticles2D" parent="."]
-emitting = false
-amount = 50
-lifetime = 0.5
+amount = 40
+lifetime = 0.7
 one_shot = true
 explosiveness = 0.9
-process_material = SubResource("ParticleProcessMaterial_drsql")
+randomness = 0.4
+direction = Vector2(0, -1)
+spread = 90.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 60.0
+initial_velocity_max = 120.0
+scale_amount_min = 4.0
+scale_amount_max = 10.0
+color = Color(0.909804, 0.262745, 0.266667, 1)
 
-[node name="HealEffect" type="GPUParticles2D" parent="."]
+[node name="DeathEffect" type="CPUParticles2D" parent="."]
 emitting = false
-amount = 30
-lifetime = 0.8
+amount = 100
 one_shot = true
-explosiveness = 0.7
-process_material = SubResource("ParticleProcessMaterial_u8jg3")
+explosiveness = 1.0
+randomness = 0.5
+emission_shape = 1
+emission_sphere_radius = 20.0
+direction = Vector2(0, 0)
+spread = 180.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 80.0
+initial_velocity_max = 200.0
+scale_amount_min = 6.0
+scale_amount_max = 15.0
+color = Color(0.909804, 0.262745, 0.266667, 1)
+
+[node name="HealEffect" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 60
+lifetime = 1.2
+one_shot = true
+explosiveness = 0.8
+randomness = 0.4
+emission_shape = 1
+emission_sphere_radius = 30.0
+direction = Vector2(0, -1)
+spread = 180.0
+gravity = Vector2(0, -20)
+initial_velocity_min = 30.0
+initial_velocity_max = 80.0
+scale_amount_min = 4.0
+scale_amount_max = 10.0
+color = Color(0.227451, 0.85098, 0.415686, 1)
 
 [connection signal="timeout" from="ShotTimer" to="." method="_on_shot_timer_timeout"]

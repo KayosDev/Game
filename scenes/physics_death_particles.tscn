@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3 uid="uid://clgn0k2wqkbuu"]
+
+[ext_resource type="Script" path="res://scripts/physics_death_particles.gd" id="1_l38dj"]
+
+[node name="PhysicsDeathParticles" type="Node2D"]
+z_index = 5
+script = ExtResource("1_l38dj")
+particle_count = 25
+min_size = 4.0
+max_size = 10.0 

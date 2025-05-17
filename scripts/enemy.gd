@@ -633,44 +633,24 @@ func get_hit(damage: int, bullet_trans: Transform2D):
 		get_parent().apply_screen_shake(shake_amount, 0.2)
 
 func create_death_explosion():
+	# Attempt to load the physics-based death particles
+	var particles_scene = load("res://scenes/physics_death_particles.tscn")
+	
+	# If scene couldn't be loaded, create simple particles instead
+	if particles_scene == null:
+		# Create simple fallback particles
+		create_simple_death_particles()
+		return
+		
 	# Create the new physics-based death particles
-	var physics_particles_resource = load("res://scenes/physics_death_particles.tscn")
-	if physics_particles_resource:
-		var physics_particles = physics_particles_resource.instantiate()
-		physics_particles.position = global_position
-		
-		# Set the particle color based on enemy type
-		physics_particles.set_particle_color(enemy_type)
-		
-		# Add to the scene
-		get_tree().root.add_child(physics_particles)
-	else:
-		# Fallback to simpler particles if file can't be loaded
-		var fallback_particles = CPUParticles2D.new()
-		fallback_particles.position = global_position
-		fallback_particles.amount = 30
-		fallback_particles.lifetime = 0.6
-		fallback_particles.explosiveness = 0.9
-		fallback_particles.direction = Vector2(0, -1)
-		fallback_particles.spread = 180
-		fallback_particles.gravity = Vector2(0, 0)
-		fallback_particles.initial_velocity_min = 60
-		fallback_particles.initial_velocity_max = 120
-		fallback_particles.scale_amount_min = 3
-		fallback_particles.scale_amount_max = 3
-		fallback_particles.color = modulate
-		
-		fallback_particles.emitting = true
-		fallback_particles.one_shot = true
-		get_tree().root.add_child(fallback_particles)
-		
-		# Auto-clean up
-		var timer = Timer.new()
-		timer.wait_time = 1.0
-		timer.one_shot = true
-		timer.autostart = true
-		fallback_particles.add_child(timer)
-		timer.timeout.connect(func(): fallback_particles.queue_free())
+	var physics_particles = particles_scene.instantiate()
+	physics_particles.position = global_position
+	
+	# Set the particle color based on enemy type
+	physics_particles.set_particle_color(enemy_type)
+	
+	# Add to the scene
+	get_tree().root.add_child(physics_particles)
 	
 	# Brief slow-motion effect on death
 	Engine.time_scale = 0.6
@@ -682,7 +662,61 @@ func create_death_explosion():
 	var reset_timescale_func = func(): Engine.time_scale = 1.0
 	slow_timer.timeout.connect(reset_timescale_func)
 
-# The create_death_ring function was removed because we now use physics-based particles
+# Fallback function for when the death particles scene isn't available
+func create_simple_death_particles():
+	# Create simple CPU particles as fallback
+	var particles = CPUParticles2D.new()
+	particles.position = global_position
+	particles.amount = 30
+	particles.lifetime = 0.8
+	particles.explosiveness = 1.0
+	particles.direction = Vector2(0, 0)
+	particles.spread = 180
+	particles.gravity = Vector2(0, 200)
+	particles.initial_velocity_min = 80
+	particles.initial_velocity_max = 160
+	particles.scale_amount_min = 4
+	particles.scale_amount_max = 8
+	
+	# Set color based on enemy type
+	match enemy_type:
+		"basic":
+			particles.color = Color(0.8, 0.2, 0.2)  # Red
+		"fast":
+			particles.color = Color(0.2, 0.7, 0.2)  # Green
+		"tank":
+			particles.color = Color(0.2, 0.2, 0.8)  # Blue
+		"splitter":
+			particles.color = Color(0.8, 0.6, 0.2)  # Orange
+		"bomber":
+			particles.color = Color(0.7, 0.2, 0.7)  # Purple
+		"shooter":
+			particles.color = Color(0.2, 0.7, 0.7)  # Cyan
+		_:
+			particles.color = Color(0.8, 0.2, 0.2)  # Default red
+	
+	particles.emitting = true
+	particles.one_shot = true
+	get_tree().root.add_child(particles)
+	
+	# Auto-clean up
+	var timer = Timer.new()
+	timer.wait_time = 1.0
+	timer.one_shot = true
+	timer.autostart = true
+	particles.add_child(timer)
+	var free_particles_func = func(): particles.queue_free()
+	timer.timeout.connect(free_particles_func)
+	
+	# Brief slow-motion effect on death
+	Engine.time_scale = 0.6
+	var slow_timer = Timer.new()
+	slow_timer.wait_time = 0.1
+	slow_timer.one_shot = true
+	slow_timer.autostart = true
+	get_tree().root.add_child(slow_timer)
+	var reset_timescale_func = func(): Engine.time_scale = 1.0
+	slow_timer.timeout.connect(reset_timescale_func)
 
 func create_shield_break_effect():
 	# Shield break effects disabled
